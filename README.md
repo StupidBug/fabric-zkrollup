@@ -133,6 +133,10 @@ zkrollup/
   - 余额查询
   - 区块操作
 - 完整的交易跟踪和查询系统
+- 密钥管理工具
+  - 密钥对生成
+  - 交易签名
+  - 公钥验证
 
 ### 技术特性
 - 支持空交易区块的创建和验证
@@ -147,6 +151,10 @@ zkrollup/
 - 线程安全的状态管理
   - 使用互斥锁保护共享资源
   - 支持并发交易处理
+- ECDSA签名系统
+  - 基于P256曲线的密钥生成
+  - 交易签名和验证
+  - 公钥管理
 
 ### 待实现功能
 - 交易签名系统
@@ -180,8 +188,24 @@ go mod download
 #### 手动构建运行
 
 ```bash
+# 构建主程序
 go build ./cmd/zkrollup
+
+# 构建密钥生成工具
+go build ./cmd/keygen
+
+# 运行主程序
 ./zkrollup
+```
+
+#### 使用密钥生成工具
+
+```bash
+# 生成新的密钥对
+./keygen -genkey
+
+# 签名交易
+./keygen -sign -from <sender_address> -to <receiver_address> -value <amount> -nonce <nonce> -privkey <private_key>
 ```
 
 #### 使用部署脚本
@@ -236,123 +260,99 @@ chmod +x scripts/deploy.sh test/transfer_test.sh
 ### 交易相关接口
 
 #### 发送交易
-- **POST** `/api/v1/transactions`
+- **POST** `/api/v1/transaction/send`
 - **请求体**:
   ```json
   {
-    "from": "hex_address",
-    "to": "hex_address",
-    "amount": "string"
+    "from": "0000000000000000000000000000000000000001",
+    "to": "0000000000000000000000000000000000000002",
+    "value": 100,
+    "nonce": 1,
+    "signature": {
+      "r": "hex_string",
+      "s": "hex_string"
+    },
+    "publicKey": {
+      "x": "hex_string",
+      "y": "hex_string"
+    }
   }
   ```
 - **响应**:
   ```json
   {
-    "message": "Transaction added to pool",
-    "hash": "transaction_hash"
+    "hash": "hex_string",
+    "from": "address",
+    "to": "address",
+    "value": 100,
+    "nonce": 1,
+    "status": "pending",
+    "timestamp": 1234567890,
+    "signature": {
+      "r": "hex_string",
+      "s": "hex_string"
+    },
+    "publicKey": {
+      "x": "hex_string",
+      "y": "hex_string"
+    }
   }
   ```
 
 #### 查询交易
-- **GET** `/api/v1/transactions/:hash`
+- **GET** `/api/v1/transaction/get?hash={transaction_hash}`
 - **响应**:
   ```json
   {
-    "hash": "transaction_hash",
-    "from": "sender_address",
-    "to": "receiver_address",
-    "value": "amount",
-    "nonce": number,
-    "status": "pending|confirmed",
-    "blockHeight": number,  // 如果已确认
-    "blockHash": "hash",    // 如果已确认
-    "timestamp": "time"     // 如果已确认
+    "hash": "hex_string",
+    "from": "address",
+    "to": "address",
+    "value": 100,
+    "nonce": 1,
+    "status": "confirmed",
+    "timestamp": 1234567890,
+    "signature": {
+      "r": "hex_string",
+      "s": "hex_string"
+    },
+    "publicKey": {
+      "x": "hex_string",
+      "y": "hex_string"
+    }
   }
   ```
 
-#### 查询交易池
-- **GET** `/api/v1/transactions/pool`
-- **响应**:
-  ```json
-  {
-    "count": number,
-    "transactions": [
-      {
-        "hash": "transaction_hash",
-        "from": "sender_address",
-        "to": "receiver_address",
-        "value": "amount",
-        "nonce": number
-      }
-    ]
-  }
-  ```
-
-### 余额相关接口
+### 账户相关接口
 
 #### 查询余额
-- **GET** `/api/v1/balances/:address`
+- **GET** `/api/v1/balance/get?address={address}`
 - **响应**:
   ```json
   {
-    "address": "hex_address",
-    "balance": "string"
+    "address": "address",
+    "balance": 1000
   }
   ```
 
-#### 设置余额（测试用）
-- **POST** `/api/v1/balances`
-- **请求体**:
-  ```json
-  {
-    "address": "hex_address",
-    "balance": "string"
-  }
-  ```
+#### 查询Nonce
+- **GET** `/api/v1/account/nonce?address={address}`
 - **响应**:
   ```json
   {
-    "message": "Balance set successfully",
-    "address": "hex_address",
-    "balance": "string"
+    "address": "address",
+    "nonce": 1
   }
   ```
 
-### 区块相关接口
+### 状态相关接口
 
-#### 创建区块（手动）
-- **POST** `/api/v1/blocks`
-- **说明**: 手动创建区块，通常不需要调用，因为系统会自动创建区块
+#### 查询状态根
+- **GET** `/api/v1/state/root`
 - **响应**:
   ```json
   {
-    "height": number,
-    "transactions": number,
-    "hash": "block_hash"
+    "stateRoot": "hex_string"
   }
   ```
 
-#### 查询区块
-- **GET** `/api/v1/blocks/:height`
-- **响应**:
-  ```json
-  {
-    "height": number,
-    "hash": "block_hash",
-    "prevHash": "previous_block_hash",
-    "merkleRoot": "merkle_root",
-    "timestamp": "time",
-    "transactions": ["tx_hash1", "tx_hash2", ...]
-  }
-  ```
-
-#### 查询区块链信息
-- **GET** `/api/v1/info`
-- **响应**:
-  ```json
-  {
-    "height": number,
-    "latestBlockHash": "hash",
-    "timestamp": "timestamp"
-  }
-  ```
+详细的API文档请参考 [API文档](docs/api.md)
