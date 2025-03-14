@@ -557,3 +557,13 @@ func (bc *Blockchain) GetBlocks() []*block.Block {
 	copy(blocks, bc.blocks)
 	return blocks
 }
+
+// GetAllBlocks returns all blocks with their transactions
+func (bc *Blockchain) GetAllBlocks() []*block.Block {
+	bc.mu.RLock()
+	defer bc.mu.RUnlock()
+
+	blocks := make([]*block.Block, len(bc.blocks))
+	copy(blocks, bc.blocks)
+	return blocks
+}

@@ -61,6 +61,18 @@ type BalanceResponse struct {
 	Balance string `json:"balance"`
 }
 
+// BlockResponse represents a block response
+type BlockResponse struct {
+	Height           uint64                `json:"height"`
+	Hash             string                `json:"hash"`
+	PrevHash         string                `json:"prevHash"`
+	MerkleRoot       string                `json:"merkleRoot"`
+	StateRoot        string                `json:"stateRoot"`
+	Timestamp        int64                 `json:"timestamp"`
+	TransactionCount uint32                `json:"transactionCount"`
+	Transactions     []TransactionResponse `json:"transactions"`
+}
+
 // SendTransaction handles transaction submission
 func (h *Handler) SendTransaction(c *gin.Context) {
 	var req TransactionRequest
@@ -273,5 +285,47 @@ func (h *Handler) GetTransactionPool(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"count":        len(txs),
 		"transactions": txs,
+	})
+}
+
+// GetAllBlocks handles retrieving all blocks with their transactions
+func (h *Handler) GetAllBlocks(c *gin.Context) {
+	blocks := h.blockchain.GetAllBlocks()
+
+	var response []BlockResponse
+	for _, block := range blocks {
+		blockHash := block.ComputeHash()
+		prevHash := block.Header.PrevHash
+
+		var transactions []TransactionResponse
+		for _, tx := range block.Transactions {
+			transactions = append(transactions, TransactionResponse{
+				Hash:      hex.EncodeToString(tx.Hash[:]),
+				From:      tx.From,
+				To:        tx.To,
+				Value:     strconv.Itoa(tx.Value),
+				Nonce:     tx.Nonce,
+				Status:    tx.Status.String(),
+				Timestamp: tx.Timestamp,
+			})
+		}
+
+		response = append(response, BlockResponse{
+			Height:           block.Header.Height,
+			Hash:             hex.EncodeToString(blockHash[:]),
+			PrevHash:         hex.EncodeToString(prevHash[:]),
+			MerkleRoot:       hex.EncodeToString(block.Header.MerkleRoot[:]),
+			StateRoot:        block.Header.StateRoot,
+			Timestamp:        block.Header.Timestamp.Unix(),
+			TransactionCount: block.Header.TransactionCount,
+			Transactions:     transactions,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data": gin.H{
+			"blocks": response,
+		},
 	})
 }

@@ -276,4 +276,40 @@ else
     exit 1
 fi
 
-echo -e "${GREEN}All tests passed successfully!${NC}" 
+echo -e "${GREEN}All tests passed successfully!${NC}"
+
+# Get all blocks with formatted output
+echo -e "\n${GREEN}Fetching all blocks...${NC}"
+curl -s "$BASE_URL/blocks" | jq -r '
+  "Blockchain Status:",
+  "-----------------",
+  "Total Blocks: \(.data.blocks | length)",
+  "",
+  (.data.blocks | to_entries | .[] | 
+    "Block #\(.value.height)",
+    "Hash: \(.value.hash)",
+    "Previous Hash: \(.value.prevHash)",
+    "Merkle Root: \(.value.merkleRoot)",
+    "State Root: \(.value.stateRoot)",
+    "Timestamp: \(.value.timestamp)",
+    "Transaction Count: \(.value.transactionCount)",
+    "",
+    "Transactions:",
+    (if (.value.transactions | length) > 0 then
+      (.value.transactions | to_entries | .[] |
+        "  Transaction #\(.key + 1)",
+        "  Hash: \(.value.hash)",
+        "  From: \(.value.from)",
+        "  To: \(.value.to)",
+        "  Value: \(.value.value)",
+        "  Nonce: \(.value.nonce)",
+        "  Status: \(.value.status)",
+        "  Timestamp: \(.value.timestamp)",
+        ""
+      )
+    else
+      "  No transactions in this block"
+    end),
+    "-----------------"
+  )
+' 

@@ -39,6 +39,9 @@ func (r *Router) Setup() {
 
 		// State endpoints
 		v1.GET("/state/root", r.handler.GetStateRoot)
+
+		// Block endpoints
+		v1.GET("/blocks", r.handler.GetAllBlocks)
 	}
 }
 
