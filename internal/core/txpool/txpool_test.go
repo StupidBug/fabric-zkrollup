@@ -1,7 +1,6 @@
 package txpool
 
 import (
-	"math/big"
 	"testing"
 	"time"
 	"zkrollup/internal/types/transaction"
@@ -11,7 +10,7 @@ func createTestTransaction(value int64, nonce uint64) transaction.Transaction {
 	return transaction.Transaction{
 		From:      "sender",
 		To:        "receiver",
-		Value:     big.NewInt(value),
+		Value:     int(value),
 		Nonce:     nonce,
 		Status:    transaction.StatusPending,
 		Timestamp: time.Now().Unix(),
@@ -88,9 +87,9 @@ func TestTxPoolGetAll(t *testing.T) {
 	}
 
 	// Verify transactions are copied
-	txs[0].Value = big.NewInt(3000)
+	txs[0].Value = 3000
 	poolTx := pool.Get(tx1.Hash)
-	if poolTx.Value.Cmp(big.NewInt(1000)) != 0 {
+	if poolTx.Value != 1000 {
 		t.Error("Pool transaction was modified when modifying GetAll result")
 	}
 }

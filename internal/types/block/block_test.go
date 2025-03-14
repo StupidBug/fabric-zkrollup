@@ -1,7 +1,6 @@
 package block
 
 import (
-	"math/big"
 	"testing"
 	"time"
 	"zkrollup/internal/crypto"
@@ -12,7 +11,7 @@ func createTestTransaction(from, to string, value int64, nonce uint64) transacti
 	transaction := transaction.Transaction{
 		From:      from,
 		To:        to,
-		Value:     big.NewInt(value),
+		Value:     int(value),
 		Nonce:     nonce,
 		Status:    transaction.StatusPending,
 		Timestamp: time.Now().Unix(),

@@ -14,7 +14,7 @@ func TestTransactionHash(t *testing.T) {
 	tx := Transaction{
 		From:      "0x1234567890123456789012345678901234567890",
 		To:        "0x0987654321098765432109876543210987654321",
-		Value:     big.NewInt(1000),
+		Value:     1000,
 		Nonce:     1,
 		Status:    StatusPending,
 		Timestamp: time.Now().Unix(),
@@ -37,7 +37,7 @@ func TestTransactionHash(t *testing.T) {
 
 	// Verify different transactions produce different hashes
 	tx2 := tx
-	tx2.Value = big.NewInt(2000)
+	tx2.Value = 2000
 	hash3 := tx2.ComputeHash()
 	if hash == hash3 {
 		t.Error("Expected different hash for different transaction")
@@ -67,7 +67,7 @@ func TestTransactionString(t *testing.T) {
 	tx := Transaction{
 		From:      "sender",
 		To:        "receiver",
-		Value:     big.NewInt(1000),
+		Value:     1000,
 		Nonce:     1,
 		Status:    StatusPending,
 		Timestamp: time.Now().Unix(),
@@ -120,7 +120,7 @@ func TestTransactionSignature(t *testing.T) {
 	tx := Transaction{
 		From:      "sender",
 		To:        "receiver",
-		Value:     big.NewInt(1000),
+		Value:     1000,
 		Nonce:     1,
 		Status:    StatusPending,
 		Timestamp: time.Now().Unix(),
@@ -150,7 +150,7 @@ func TestTransactionSignature(t *testing.T) {
 	}
 
 	// Test signature with modified transaction data
-	tx.Value = big.NewInt(2000)
+	tx.Value = 2000
 	if tx.VerifySignature(&privateKey.PublicKey) {
 		t.Error("Signature verification should fail with modified transaction data")
 	}
@@ -164,7 +164,7 @@ func TestSignatureConsistency(t *testing.T) {
 	tx1 := Transaction{
 		From:      "sender",
 		To:        "receiver",
-		Value:     big.NewInt(1000),
+		Value:     1000,
 		Nonce:     1,
 		Status:    StatusPending,
 		Timestamp: time.Now().Unix(),
@@ -200,7 +200,7 @@ func TestInvalidSignatures(t *testing.T) {
 	tx := Transaction{
 		From:      "sender",
 		To:        "receiver",
-		Value:     big.NewInt(1000),
+		Value:     1000,
 		Nonce:     1,
 		Status:    StatusPending,
 		Timestamp: time.Now().Unix(),

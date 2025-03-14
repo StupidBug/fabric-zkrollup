@@ -133,7 +133,7 @@ func (bc *Blockchain) AddTransaction(tx transaction.Transaction) error {
 
 	// Validate balance and nonce
 	if senderBalance < tx.Value {
-		log.Printf("Insufficient balance - Required: %s, Available: %s",
+		log.Printf("Insufficient balance - Required: %d, Available: %d",
 			tx.Value, senderBalance)
 		return fmt.Errorf("insufficient balance")
 	}
@@ -203,7 +203,7 @@ func (bc *Blockchain) setBalance(address string, balance int) error {
 
 	// Set balance in state
 	bc.state.SetBalance(address, balance)
-	log.Printf("Set balance for address %s to %s", address, balance)
+	log.Printf("Set balance for address %s to %d", address, balance)
 	return nil
 }
 
@@ -403,11 +403,11 @@ func (bc *Blockchain) StopAutoBlock() {
 func (bc *Blockchain) validateTransaction(transaction *transaction.Transaction) error {
 	// Note: This function assumes the caller holds appropriate locks
 	senderBalance := bc.state.GetBalance(transaction.From)
-	log.Printf("Validating transaction - Sender: %s, Balance: %s, Transfer Amount: %s",
+	log.Printf("Validating transaction - Sender: %s, Balance: %d, Transfer Amount: %d",
 		transaction.From, senderBalance, transaction.Value)
 
 	if senderBalance < transaction.Value {
-		log.Printf("Insufficient balance - Required: %s, Available: %s",
+		log.Printf("Insufficient balance - Required: %d, Available: %d",
 			transaction.Value, senderBalance)
 		return fmt.Errorf("insufficient balance")
 	}

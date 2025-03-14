@@ -1,22 +1,41 @@
 package blockchain
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"fmt"
-	"math/big"
 	"testing"
 	"time"
 	"zkrollup/internal/types/transaction"
 )
 
 func createTestTransaction(value int64, nonce uint64) transaction.Transaction {
-	return transaction.Transaction{
+	// Generate a test key pair
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to generate key pair: %v", err))
+	}
+
+	tx := transaction.Transaction{
 		From:      "0000000000000000000000000000000000000001", // Use genesis account
 		To:        "0000000000000000000000000000000000000002", // Use genesis account
-		Value:     big.NewInt(value),
+		Value:     int(value),
 		Nonce:     nonce,
 		Status:    transaction.StatusPending,
 		Timestamp: time.Now().Unix(),
 	}
+
+	// Sign the transaction
+	if err := tx.SignTransaction(privateKey); err != nil {
+		panic(fmt.Sprintf("Failed to sign transaction: %v", err))
+	}
+
+	// Store public key in blockchain state
+	bc := NewBlockchain()
+	bc.SetPublicKey(tx.From, &privateKey.PublicKey)
+
+	return tx
 }
 
 func TestBlockCreation(t *testing.T) {
@@ -25,6 +44,18 @@ func TestBlockCreation(t *testing.T) {
 	// Create and add a transaction
 	tx1 := createTestTransaction(100, 0)
 	tx1.Hash = tx1.ComputeHash()
+
+	// Store public key in blockchain state
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+	bc.SetPublicKey(tx1.From, &privateKey.PublicKey)
+
+	// Sign the transaction
+	if err := tx1.SignTransaction(privateKey); err != nil {
+		t.Fatalf("Failed to sign transaction: %v", err)
+	}
 
 	if err := bc.AddTransaction(tx1); err != nil {
 		t.Fatalf("Failed to add transaction: %v", err)
@@ -46,13 +77,13 @@ func TestBlockCreation(t *testing.T) {
 
 	// Verify balances are updated
 	senderBalance := bc.GetBalance("0000000000000000000000000000000000000001")
-	if senderBalance.Cmp(big.NewInt(999900)) != 0 { // 1000000 - 100
-		t.Errorf("Expected sender balance 999900, got %s", senderBalance.String())
+	if senderBalance != 999900 { // 1000000 - 100
+		t.Errorf("Expected sender balance 999900, got %d", senderBalance)
 	}
 
 	receiverBalance := bc.GetBalance("0000000000000000000000000000000000000002")
-	if receiverBalance.Cmp(big.NewInt(500100)) != 0 { // 500000 + 100
-		t.Errorf("Expected receiver balance 500100, got %s", receiverBalance.String())
+	if receiverBalance != 500100 { // 500000 + 100
+		t.Errorf("Expected receiver balance 500100, got %d", receiverBalance)
 	}
 }
 
@@ -62,6 +93,18 @@ func TestAutoBlockCreation(t *testing.T) {
 	// Create and add transaction
 	tx1 := createTestTransaction(100, 0)
 	tx1.Hash = tx1.ComputeHash()
+
+	// Store public key in blockchain state
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+	bc.SetPublicKey(tx1.From, &privateKey.PublicKey)
+
+	// Sign the transaction
+	if err := tx1.SignTransaction(privateKey); err != nil {
+		t.Fatalf("Failed to sign transaction: %v", err)
+	}
 
 	if err := bc.AddTransaction(tx1); err != nil {
 		t.Fatalf("Failed to add transaction: %v", err)
@@ -83,33 +126,49 @@ func TestAutoBlockCreation(t *testing.T) {
 
 	// Verify balances
 	senderBalance := bc.GetBalance("0000000000000000000000000000000000000001")
-	if senderBalance.Cmp(big.NewInt(999900)) != 0 { // 1000000 - 100
-		t.Errorf("Expected sender balance 999900, got %s", senderBalance.String())
+	if senderBalance != 999900 { // 1000000 - 100
+		t.Errorf("Expected sender balance 999900, got %d", senderBalance)
 	}
 
 	receiverBalance := bc.GetBalance("0000000000000000000000000000000000000002")
-	if receiverBalance.Cmp(big.NewInt(500100)) != 0 { // 500000 + 100
-		t.Errorf("Expected receiver balance 500100, got %s", receiverBalance.String())
+	if receiverBalance != 500100 { // 500000 + 100
+		t.Errorf("Expected receiver balance 500100, got %d", receiverBalance)
 	}
 }
 
 func TestTransactionValidation(t *testing.T) {
 	bc := NewBlockchain()
 
+	// Generate a key pair for testing
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate key pair: %v", err)
+	}
+	bc.SetPublicKey("0000000000000000000000000000000000000001", &privateKey.PublicKey)
+
 	// Test insufficient balance
 	tx1 := createTestTransaction(2000000, 0) // Amount larger than genesis balance
+	if err := tx1.SignTransaction(privateKey); err != nil {
+		t.Fatalf("Failed to sign transaction: %v", err)
+	}
 	if err := bc.AddTransaction(tx1); err == nil {
 		t.Error("Expected error for insufficient balance")
 	}
 
 	// Test invalid nonce
 	tx2 := createTestTransaction(100, 1) // nonce should be 0
+	if err := tx2.SignTransaction(privateKey); err != nil {
+		t.Fatalf("Failed to sign transaction: %v", err)
+	}
 	if err := bc.AddTransaction(tx2); err == nil {
 		t.Error("Expected error for invalid nonce")
 	}
 
 	// Test valid transaction
 	tx3 := createTestTransaction(100, 0)
+	if err := tx3.SignTransaction(privateKey); err != nil {
+		t.Fatalf("Failed to sign transaction: %v", err)
+	}
 	if err := bc.AddTransaction(tx3); err != nil {
 		t.Errorf("Unexpected error for valid transaction: %v", err)
 	}
