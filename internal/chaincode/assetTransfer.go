@@ -1,7 +1,7 @@
 package chaincode
 
 import (
-	// "encoding/json"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -16,17 +16,24 @@ import (
 )
 
 var ccpPath = filepath.Join(
-	"..",
-	"..",
+	"/",
+	"home",
+	"zkr",
+	"hyperledger-fabric",
+	"fabric-samples",
 	"test-network",
 	"organizations",
 	"peerOrganizations",
 	"org1.example.com",
 	"connection-org1.yaml",
 )
+
 var credPath = filepath.Join(
-	"..",
-	"..",
+	"/",
+	"home",
+	"zkr",
+	"hyperledger-fabric",
+	"fabric-samples",
 	"test-network",
 	"organizations",
 	"peerOrganizations",
@@ -173,7 +180,13 @@ func a(output string) {
 	if err != nil {
 		log.Fatalf("Failed to evaluate transaction: %v", err)
 	}
-	log.Println(string(result))
+	// log.Println(string(result))
+	// 格式化JSON输出
+	var prettyJSON bytes.Buffer
+	if err := json.Indent(&prettyJSON, result, "", "    "); err != nil {
+		log.Fatalf("Failed to format JSON: %v", err)
+	}
+	log.Println(prettyJSON.String())
 
 }
 func main() {
