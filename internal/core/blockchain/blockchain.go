@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	// "zkrollup/internal/chaincode"
+	"zkrollup/internal/chaincode"
 	"zkrollup/internal/core/txpool"
 	"zkrollup/internal/crypto"
 	"zkrollup/internal/types"
@@ -467,7 +467,7 @@ func (bc *Blockchain) applyTransactions(block *block.Block) (string, error) {
 		return "", fmt.Errorf("failed to generate ZK proof [req: %#v]: %v", input, err)
 	}
 
-	// chaincode.JsonVerify(output)
+	chaincode.JsonVerify(output)
 
 	// 更新账户状态
 	for i := range block.Transactions {
