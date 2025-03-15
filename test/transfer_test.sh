@@ -150,6 +150,14 @@ send_transaction() {
 # Main test process
 echo -e "${GREEN}Starting transfer test...${NC}"
 
+# Rebuild keygen tool
+echo -e "${GREEN}Rebuilding keygen tool...${NC}"
+if ! go build -o keygen ./cmd/keygen; then
+    echo -e "${RED}Failed to build keygen tool${NC}"
+    exit 1
+fi
+echo -e "${GREEN}Keygen tool built successfully${NC}"
+
 # Check if server is running
 check_server
 
