@@ -7,7 +7,8 @@
 ```
 zkrollup/
 ├── cmd/                 # 命令行入口
-│   └── zkrollup/       # 主程序入口
+│   ├── zkrollup/       # 主程序入口
+│   └── keygen/         # 密钥生成和交易签名工具
 ├── internal/           # 内部包
 │   ├── api/           # HTTP API处理器
 │   │   ├── handlers/  # API请求处理器
@@ -15,15 +16,13 @@ zkrollup/
 │   │   └── router/    # 路由配置
 │   ├── core/          # 核心功能
 │   │   ├── blockchain/# 区块链核心实现
-│   │   ├── state/     # 状态管理
-│   │   └── txpool/    # 交易池管理
+│   │   ├── txpool/    # 交易池管理
+│   │   └── crypto/    # 加密相关功能
 │   ├── types/         # 数据类型定义
 │   │   ├── block/     # 区块相关类型
-│   │   ├── tx/        # 交易相关类型
+│   │   ├── transaction/# 交易相关类型
 │   │   └── state/     # 状态相关类型
-│   └── crypto/        # 加密相关功能
-│       ├── hash/      # 哈希函数实现
-│       └── merkle/    # Merkle树实现
+│   └── zk/            # ZK证明相关功能
 ├── pkg/               # 可导出的包
 │   └── utils/        # 通用工具函数
 ├── scripts/          # 部署和管理脚本
@@ -31,10 +30,10 @@ zkrollup/
 │   └── test.sh       # 测试脚本
 ├── test/             # 测试文件和脚本
 │   ├── integration/  # 集成测试
-│   └── unit/        # 单元测试
+│   └── transfer_test.sh # 转账测试脚本
 ├── docs/             # 项目文档
-│   ├── api/         # API文档
-│   └── design/      # 设计文档
+│   ├── api.md        # API文档
+│   └── design.md     # 设计文档
 └── .gitignore       # Git忽略文件配置
 ```
 
@@ -66,6 +65,10 @@ zkrollup/
   - 密钥对生成
   - 交易签名
   - 公钥验证
+- 交易签名系统
+  - ECDSA签名生成和验证
+  - 交易安全性验证
+  - 公钥管理
 
 ### 技术特性
 - 支持空交易区块的创建和验证
@@ -86,7 +89,6 @@ zkrollup/
   - 公钥管理
 
 ### 待实现功能
-- 交易签名系统
 - 持久化存储
 - ZK证明系统
 - 高级查询功能
@@ -176,6 +178,7 @@ chmod +x scripts/deploy.sh test/transfer_test.sh
    - 执行转账交易
    - 等待交易确认（最多60秒）
    - 验证转账后的余额变化
+   - 查询所有区块和交易信息
 
 测试输出使用彩色标记：
 - 绿色：测试步骤和成功信息
@@ -208,20 +211,23 @@ chmod +x scripts/deploy.sh test/transfer_test.sh
 - **响应**:
   ```json
   {
-    "hash": "hex_string",
-    "from": "address",
-    "to": "address",
-    "value": 100,
-    "nonce": 1,
-    "status": "pending",
-    "timestamp": 1234567890,
-    "signature": {
-      "r": "hex_string",
-      "s": "hex_string"
-    },
-    "publicKey": {
-      "x": "hex_string",
-      "y": "hex_string"
+    "status": "success",
+    "data": {
+      "hash": "hex_string",
+      "from": "address",
+      "to": "address",
+      "value": 100,
+      "nonce": 1,
+      "status": "pending",
+      "timestamp": 1234567890,
+      "signature": {
+        "r": "hex_string",
+        "s": "hex_string"
+      },
+      "publicKey": {
+        "x": "hex_string",
+        "y": "hex_string"
+      }
     }
   }
   ```
@@ -231,20 +237,15 @@ chmod +x scripts/deploy.sh test/transfer_test.sh
 - **响应**:
   ```json
   {
-    "hash": "hex_string",
-    "from": "address",
-    "to": "address",
-    "value": 100,
-    "nonce": 1,
-    "status": "confirmed",
-    "timestamp": 1234567890,
-    "signature": {
-      "r": "hex_string",
-      "s": "hex_string"
-    },
-    "publicKey": {
-      "x": "hex_string",
-      "y": "hex_string"
+    "status": "success",
+    "data": {
+      "hash": "hex_string",
+      "from": "address",
+      "to": "address",
+      "value": 100,
+      "nonce": 1,
+      "status": "confirmed",
+      "timestamp": 1234567890
     }
   }
   ```
@@ -256,8 +257,11 @@ chmod +x scripts/deploy.sh test/transfer_test.sh
 - **响应**:
   ```json
   {
-    "address": "address",
-    "balance": 1000
+    "status": "success",
+    "data": {
+      "address": "address",
+      "balance": 1000
+    }
   }
   ```
 
@@ -266,8 +270,11 @@ chmod +x scripts/deploy.sh test/transfer_test.sh
 - **响应**:
   ```json
   {
-    "address": "address",
-    "nonce": 1
+    "status": "success",
+    "data": {
+      "address": "address",
+      "nonce": 1
+    }
   }
   ```
 
@@ -278,7 +285,55 @@ chmod +x scripts/deploy.sh test/transfer_test.sh
 - **响应**:
   ```json
   {
-    "stateRoot": "hex_string"
+    "status": "success",
+    "data": {
+      "stateRoot": "hex_string"
+    }
+  }
+  ```
+
+### 区块相关接口
+
+#### 查询所有区块
+- **GET** `/api/v1/blocks`
+- **响应**:
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "blocks": [
+        {
+          "height": 0,
+          "hash": "hex_string",
+          "prevHash": "hex_string",
+          "merkleRoot": "hex_string",
+          "stateRoot": "hex_string",
+          "timestamp": 1234567890,
+          "transactionCount": 0,
+          "transactions": []
+        },
+        {
+          "height": 1,
+          "hash": "hex_string",
+          "prevHash": "hex_string",
+          "merkleRoot": "hex_string",
+          "stateRoot": "hex_string",
+          "timestamp": 1234567891,
+          "transactionCount": 1,
+          "transactions": [
+            {
+              "hash": "hex_string",
+              "from": "address",
+              "to": "address",
+              "value": 100,
+              "nonce": 0,
+              "status": "confirmed",
+              "timestamp": 1234567890
+            }
+          ]
+        }
+      ]
+    }
   }
   ```
 
