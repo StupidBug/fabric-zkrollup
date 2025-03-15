@@ -8,8 +8,9 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-	"zkrollup/internal/core/blockchain"
-	"zkrollup/internal/types/transaction"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/core/blockchain"
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 
 	"github.com/gin-gonic/gin"
 )

@@ -1,15 +1,15 @@
-# ZK Rollup Sidechain
+# Fabric ZK Rollup Sidechain
 
-一个专注于基础区块链功能和ERC20类操作的ZK Rollup侧链实现。
+一个专注于基础区块链功能和ERC20类操作的ZK Rollup侧链实现，基于Hyperledger Fabric。
 
 ## 项目结构
 
 ```
-zkrollup/
+fabric-zkrollup/
 ├── cmd/                 # 命令行入口
 │   ├── zkrollup/       # 主程序入口
 │   └── keygen/         # 密钥生成和交易签名工具
-├── internal/           # 内部包
+├── pkg/                # 核心包
 │   ├── api/           # HTTP API处理器
 │   │   ├── handlers/  # API请求处理器
 │   │   ├── middleware/# 中间件
@@ -22,19 +22,19 @@ zkrollup/
 │   │   ├── block/     # 区块相关类型
 │   │   ├── transaction/# 交易相关类型
 │   │   └── state/     # 状态相关类型
-│   └── zk/            # ZK证明相关功能
-├── pkg/               # 可导出的包
-│   └── utils/        # 通用工具函数
-├── scripts/          # 部署和管理脚本
+│   ├── zk/            # ZK证明相关功能
+│   └── chaincode/     # Fabric链码相关功能
+├── utils/              # 通用工具函数
+├── scripts/           # 部署和管理脚本
 │   ├── deploy.sh     # 部署脚本
 │   └── test.sh       # 测试脚本
-├── test/             # 测试文件和脚本
+├── test/              # 测试文件和脚本
 │   ├── integration/  # 集成测试
 │   └── transfer_test.sh # 转账测试脚本
-├── docs/             # 项目文档
+├── docs/              # 项目文档
 │   ├── api.md        # API文档
 │   └── design.md     # 设计文档
-└── .gitignore       # Git忽略文件配置
+└── .gitignore        # Git忽略文件配置
 ```
 
 ## 主要功能
@@ -69,6 +69,9 @@ zkrollup/
   - ECDSA签名生成和验证
   - 交易安全性验证
   - 公钥管理
+- Fabric集成
+  - 链码支持
+  - 状态验证
 
 ### 技术特性
 - 支持空交易区块的创建和验证
@@ -87,10 +90,13 @@ zkrollup/
   - 基于P256曲线的密钥生成
   - 交易签名和验证
   - 公钥管理
+- Fabric集成
+  - 链码状态验证
+  - ZK证明验证
 
 ### 待实现功能
 - 持久化存储
-- ZK证明系统
+- ZK证明系统完善
 - 高级查询功能
 - 性能优化
 - 安全增强
@@ -103,12 +109,13 @@ zkrollup/
 - Go 1.20 或更高版本
 - jq (用于运行测试脚本)
 - curl (用于API测试)
+- Hyperledger Fabric 2.2+ (可选，用于链码集成)
 
 ### 安装
 
 ```bash
-git clone https://github.com/yourusername/zkrollup.git
-cd zkrollup
+git clone https://github.com/StupidBug/fabric-zkrollup.git
+cd fabric-zkrollup
 go mod download
 ```
 

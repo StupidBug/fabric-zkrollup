@@ -1,8 +1,8 @@
 package router
 
 import (
-	"zkrollup/internal/api/handlers"
-	"zkrollup/internal/core/blockchain"
+	"github.com/StupidBug/fabric-zkrollup/pkg/api/handlers"
+	"github.com/StupidBug/fabric-zkrollup/pkg/core/blockchain"
 
 	"github.com/gin-gonic/gin"
 )

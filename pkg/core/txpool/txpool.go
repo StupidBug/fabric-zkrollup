@@ -2,7 +2,8 @@ package txpool
 
 import (
 	"sync"
-	"zkrollup/internal/types/transaction"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 )
 
 // TxPool represents the transaction pool

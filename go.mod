@@ -1,4 +1,4 @@
-module zkrollup
+module github.com/StupidBug/fabric-zkrollup
 
 go 1.23.5
 

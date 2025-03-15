@@ -9,14 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"zkrollup/internal/chaincode"
-	"zkrollup/internal/core/txpool"
-	"zkrollup/internal/crypto"
-	"zkrollup/internal/types"
-	"zkrollup/internal/types/block"
-	"zkrollup/internal/types/state"
-	"zkrollup/internal/types/transaction"
-	"zkrollup/internal/zk"
+	"github.com/StupidBug/fabric-zkrollup/pkg/chaincode"
+	"github.com/StupidBug/fabric-zkrollup/pkg/core/txpool"
+	"github.com/StupidBug/fabric-zkrollup/pkg/crypto"
+	"github.com/StupidBug/fabric-zkrollup/pkg/types"
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/block"
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/state"
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
+	"github.com/StupidBug/fabric-zkrollup/pkg/zk"
 )
 
 // Blockchain represents the blockchain

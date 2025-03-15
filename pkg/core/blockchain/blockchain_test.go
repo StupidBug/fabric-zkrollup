@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
-	"zkrollup/internal/types/transaction"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 )
 
 func createTestTransaction(value int64, nonce uint64) transaction.Transaction {

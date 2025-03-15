@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"zkrollup/internal/core/crypto"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/core/crypto"
 )
 
 func main() {

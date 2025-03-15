@@ -8,7 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"zkrollup/internal/zk"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/zk"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"

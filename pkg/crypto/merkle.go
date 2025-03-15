@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"sync"
-	"zkrollup/internal/types/transaction"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 )
 
 // MerkleNode represents a node in the Merkle tree

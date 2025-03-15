@@ -3,7 +3,8 @@ package block
 import (
 	"crypto/sha256"
 	"time"
-	"zkrollup/internal/types/transaction"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 )
 
 // Block represents a block in the blockchain

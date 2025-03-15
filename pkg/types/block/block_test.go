@@ -3,8 +3,9 @@ package block
 import (
 	"testing"
 	"time"
-	"zkrollup/internal/crypto"
-	"zkrollup/internal/types/transaction"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/crypto"
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 )
 
 func createTestTransaction(from, to string, value int64, nonce uint64) transaction.Transaction {
