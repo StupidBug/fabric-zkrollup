@@ -121,33 +121,6 @@ go mod download
 
 ### 构建和运行
 
-你可以选择手动构建运行或使用部署脚本：
-
-#### 手动构建运行
-
-```bash
-# 构建主程序
-go build ./cmd/zkrollup
-
-# 构建密钥生成工具
-go build ./cmd/keygen
-
-# 运行主程序
-./zkrollup
-```
-
-#### 使用密钥生成工具
-
-```bash
-# 生成新的密钥对
-./keygen -genkey
-
-# 签名交易
-./keygen -sign -from <sender_address> -to <receiver_address> -value <amount> -nonce <nonce> -privkey <private_key>
-```
-
-#### 使用部署脚本
-
 部署脚本提供了自动化的部署流程：
 
 ```bash
@@ -156,17 +129,12 @@ chmod +x scripts/deploy.sh test/transfer_test.sh
 
 # 使用默认端口(8080)
 ./scripts/deploy.sh
-
-# 指定自定义端口
-./scripts/deploy.sh -p 8081
 ```
 
 部署脚本功能：
-- 自动停止已运行的实例（如果有）
 - 编译项目
 - 启动服务器
 - 验证服务器是否正常运行
-- 支持自定义端口配置
 
 ### 运行测试
 
