@@ -37,23 +37,7 @@ func NewBlockchain() *Blockchain {
 		autoBlock:  false,
 	}
 
-	accounts := []zk.Account{
-		{
-			Address: "0000000000000000000000000000000000000001",
-			Balance: 1000000,
-			Nonce:   0,
-		},
-		{
-			Address: "0000000000000000000000000000000000000002",
-			Balance: 500000,
-			Nonce:   0,
-		},
-		{
-			Address: "0000000000000000000000000000000000000003",
-			Balance: 300000,
-			Nonce:   0,
-		},
-	}
+	accounts := chaincode.GetAllTokenBalances()
 	sort.Slice(accounts, func(i, j int) bool {
 		return accounts[i].Address < accounts[j].Address
 	})
