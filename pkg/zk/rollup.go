@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"math/rand"
 	"strconv"
+	"strings"
 
 	"encoding/base64"
 
@@ -249,6 +250,16 @@ func ComputeAccountMerkleRoot(accounts []Account) string {
 	return computeMerkleRoot(balances)
 }
 
+// 查找账户索引的辅助函数
+func findAccountIndex(accounts []Account, address string) int {
+	for i, acc := range accounts {
+		if acc.Address == address {
+			return i
+		}
+	}
+	return -1
+}
+
 // 生成证明
 func GenerateProof(input ProofInput) (*ProofOutput, error) {
 	var buf bytes.Buffer
@@ -307,8 +318,8 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 	accounts := make([]Account, accountSize)
 	copy(accounts, input.Accounts)
 	for _, tx := range input.Transactions {
-		fromIdx := parseInt(tx.From) - 1
-		toIdx := parseInt(tx.To) - 1
+		fromIdx := findAccountIndex(accounts, tx.From)
+		toIdx := findAccountIndex(accounts, tx.To)
 		accounts[fromIdx].Balance -= tx.Amount
 		accounts[fromIdx].Nonce++
 		accounts[toIdx].Balance += tx.Amount
@@ -550,6 +561,11 @@ func VerifyProof(proofStr string) error {
 
 // 辅助函数：解析地址字符串为整数
 func parseInt(s string) int {
-	n, _ := strconv.Atoi(s)
+	// 将地址字符串转换为整数，去掉前导零
+	cleanStr := strings.TrimLeft(s, "0")
+	if cleanStr == "" {
+		return 0
+	}
+	n, _ := strconv.Atoi(cleanStr)
 	return n
 }
