@@ -227,17 +227,19 @@ type ProofOutput struct {
 	OldStateRoot string
 	BatchRoot    string
 	NewStateRoot string
+	NewAccounts  []Account   // 添加新的账户状态字段
 	Proof        interface{} // 使用interface{}来存储proof
 	Vk           interface{} // 使用interface{}来存储vk
 }
 
 // 序列化的输出结构体
 type SerializedProofOutput struct {
-	OldStateRoot string `json:"old_state_root"`
-	BatchRoot    string `json:"batch_root"`
-	NewStateRoot string `json:"new_state_root"`
-	ProofData    string `json:"proof"` // base64编码的proof数据
-	VkData       string `json:"vk"`    // base64编码的vk数据
+	OldStateRoot string    `json:"old_state_root"`
+	BatchRoot    string    `json:"batch_root"`
+	NewStateRoot string    `json:"new_state_root"`
+	NewAccounts  []Account `json:"new_accounts"` // 添加新的账户状态字段
+	ProofData    string    `json:"proof"`        // base64编码的proof数据
+	VkData       string    `json:"vk"`           // base64编码的vk数据
 }
 
 // 计算账户余额的默克尔根
@@ -377,6 +379,7 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 		OldStateRoot: input.OldStateRoot,
 		BatchRoot:    new(big.Int).SetBytes(merkleRoot).String(),
 		NewStateRoot: merkleRoot1,
+		NewAccounts:  accounts, // 添加更新后的账户状态
 		Proof:        proof,
 		Vk:           vk,
 	}
@@ -415,6 +418,7 @@ func (p *ProofOutput) MarshalJSON() ([]byte, error) {
 		OldStateRoot: p.OldStateRoot,
 		BatchRoot:    p.BatchRoot,
 		NewStateRoot: p.NewStateRoot,
+		NewAccounts:  p.NewAccounts, // 添加新的账户状态
 		ProofData:    base64.StdEncoding.EncodeToString(proofBuf.Bytes()),
 		VkData:       base64.StdEncoding.EncodeToString(vkBuf.Bytes()),
 	}
@@ -459,6 +463,7 @@ func (p *ProofOutput) UnmarshalJSON(data []byte) error {
 	p.OldStateRoot = serialized.OldStateRoot
 	p.BatchRoot = serialized.BatchRoot
 	p.NewStateRoot = serialized.NewStateRoot
+	p.NewAccounts = serialized.NewAccounts
 	p.Proof = proof
 	p.Vk = vk
 

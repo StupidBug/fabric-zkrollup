@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"sort"
@@ -12,7 +11,6 @@ import (
 	"github.com/StupidBug/fabric-zkrollup/pkg/chaincode"
 	"github.com/StupidBug/fabric-zkrollup/pkg/core/txpool"
 	"github.com/StupidBug/fabric-zkrollup/pkg/crypto"
-	"github.com/StupidBug/fabric-zkrollup/pkg/types"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/block"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/state"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
@@ -181,30 +179,6 @@ func (bc *Blockchain) GetBalance(address string) int {
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
 	return bc.state.GetBalance(address)
-}
-
-// SetBalance is now private and only used during genesis block creation
-func (bc *Blockchain) setBalance(address string, balance int) error {
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
-
-	// Only allow setting balance when creating genesis block
-	if len(bc.blocks) > 0 {
-		return fmt.Errorf("cannot set balance after genesis block: balance can only be modified through transactions")
-	}
-
-	// Convert string address to types.Address
-	var addr types.Address
-	decoded, err := hex.DecodeString(address)
-	if err != nil {
-		return fmt.Errorf("invalid address format: %v", err)
-	}
-	copy(addr[:], decoded)
-
-	// Set balance in state
-	bc.state.SetBalance(address, balance)
-	log.Printf("Set balance for address %s to %d", address, balance)
-	return nil
 }
 
 // GetNonce returns the nonce of an address
@@ -399,30 +373,6 @@ func (bc *Blockchain) StopAutoBlock() {
 	bc.mu.Unlock()
 }
 
-// validateTransaction validates a transaction
-func (bc *Blockchain) validateTransaction(transaction *transaction.Transaction) error {
-	// Note: This function assumes the caller holds appropriate locks
-	senderBalance := bc.state.GetBalance(transaction.From)
-	log.Printf("Validating transaction - Sender: %s, Balance: %d, Transfer Amount: %d",
-		transaction.From, senderBalance, transaction.Value)
-
-	if senderBalance < transaction.Value {
-		log.Printf("Insufficient balance - Required: %d, Available: %d",
-			transaction.Value, senderBalance)
-		return fmt.Errorf("insufficient balance")
-	}
-
-	// Check nonce
-	expectedNonce := bc.state.GetNonce(transaction.From)
-	if transaction.Nonce != expectedNonce {
-		log.Printf("Invalid nonce - Expected: %d, Got: %d",
-			expectedNonce, transaction.Nonce)
-		return fmt.Errorf("invalid nonce: expected %d, got %d", expectedNonce, transaction.Nonce)
-	}
-
-	return nil
-}
-
 // applyTransactions applies a list of transactions and updates the state tree
 func (bc *Blockchain) applyTransactions(block *block.Block) (string, error) {
 	// 准备输入数据
@@ -469,23 +419,21 @@ func (bc *Blockchain) applyTransactions(block *block.Block) (string, error) {
 
 	chaincode.JsonVerify(output)
 
-	// 更新账户状态
+	// 更新交易状态
 	for i := range block.Transactions {
 		tx := &block.Transactions[i]
-		// 更新发送方余额和nonce
-		fromBalance := bc.state.GetBalance(tx.From)
-		bc.state.SetBalance(tx.From, fromBalance-tx.Value)
-		bc.state.SetNonce(tx.From, tx.Nonce+1)
-
-		// 更新接收方余额
-		toBalance := bc.state.GetBalance(tx.To)
-		bc.state.SetBalance(tx.To, toBalance+tx.Value)
-
 		// 更新交易状态
 		tx.Status = transaction.StatusConfirmed
 	}
-	fmt.Println("output.NewStateRoot: ", output.NewStateRoot)
 
+	// 更新账户状态
+	for _, account := range output.NewAccounts {
+		// 更新发送方余额和nonce
+		bc.state.SetBalance(account.Address, account.Balance)
+		bc.state.SetNonce(account.Address, uint64(account.Nonce))
+	}
+
+	fmt.Println("output.NewStateRoot: ", output.NewStateRoot)
 	return output.NewStateRoot, nil
 }
 
