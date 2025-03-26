@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/StupidBug/fabric-zkrollup/pkg/api/types"
 	"github.com/StupidBug/fabric-zkrollup/pkg/core/blockchain"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 
@@ -23,60 +24,9 @@ func NewHandler(bc *blockchain.Blockchain) *Handler {
 	return &Handler{blockchain: bc}
 }
 
-// SignatureRequest represents the signature part of a transaction request
-type SignatureRequest struct {
-	R string `json:"r" binding:"required"`
-	S string `json:"s" binding:"required"`
-}
-
-// PublicKeyRequest represents the public key part of a transaction request
-type PublicKeyRequest struct {
-	X string `json:"x" binding:"required"`
-	Y string `json:"y" binding:"required"`
-}
-
-// TransactionRequest represents a transaction request
-type TransactionRequest struct {
-	From      string           `json:"from" binding:"required"`
-	To        string           `json:"to" binding:"required"`
-	Value     string           `json:"value" binding:"required"`
-	Nonce     string           `json:"nonce" binding:"required"`
-	Signature SignatureRequest `json:"signature" binding:"required"`
-	PublicKey PublicKeyRequest `json:"publicKey" binding:"required"`
-}
-
-// TransactionResponse represents a transaction response
-type TransactionResponse struct {
-	Hash      string `json:"hash"`
-	From      string `json:"from"`
-	To        string `json:"to"`
-	Value     string `json:"value"`
-	Nonce     uint64 `json:"nonce"`
-	Status    string `json:"status"`
-	Timestamp int64  `json:"timestamp"`
-}
-
-// BalanceResponse represents a balance response
-type BalanceResponse struct {
-	Address string `json:"address"`
-	Balance string `json:"balance"`
-}
-
-// BlockResponse represents a block response
-type BlockResponse struct {
-	Height           uint64                `json:"height"`
-	Hash             string                `json:"hash"`
-	PrevHash         string                `json:"prevHash"`
-	MerkleRoot       string                `json:"merkleRoot"`
-	StateRoot        string                `json:"stateRoot"`
-	Timestamp        int64                 `json:"timestamp"`
-	TransactionCount uint32                `json:"transactionCount"`
-	Transactions     []TransactionResponse `json:"transactions"`
-}
-
 // SendTransaction handles transaction submission
 func (h *Handler) SendTransaction(c *gin.Context) {
-	var req TransactionRequest
+	var req types.TransactionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -153,24 +103,26 @@ func (h *Handler) SendTransaction(c *gin.Context) {
 		return
 	}
 
-	// Create response
-	c.JSON(http.StatusOK, gin.H{
-		"hash":      hex.EncodeToString(tx.Hash[:]),
-		"from":      tx.From,
-		"to":        tx.To,
-		"value":     tx.Value,
-		"nonce":     tx.Nonce,
-		"status":    tx.Status,
-		"timestamp": tx.Timestamp,
-		"signature": gin.H{
-			"r": req.Signature.R,
-			"s": req.Signature.S,
+	// Create response as types.TransactionWithNumStatus
+	resp := types.TransactionWithNumStatus{
+		Hash:      hex.EncodeToString(tx.Hash[:]),
+		From:      tx.From,
+		To:        tx.To,
+		Value:     tx.Value,
+		Nonce:     tx.Nonce,
+		Status:    int(tx.Status),
+		Timestamp: tx.Timestamp,
+		Signature: types.Signature{
+			R: req.Signature.R,
+			S: req.Signature.S,
 		},
-		"publicKey": gin.H{
-			"x": req.PublicKey.X,
-			"y": req.PublicKey.Y,
+		PublicKey: types.PublicKey{
+			X: req.PublicKey.X,
+			Y: req.PublicKey.Y,
 		},
-	})
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetTransaction handles transaction retrieval
@@ -196,7 +148,7 @@ func (h *Handler) GetTransaction(c *gin.Context) {
 		return
 	}
 
-	resp := TransactionResponse{
+	resp := types.TransactionResponse{
 		Hash:      hex.EncodeToString(tx.Hash[:]),
 		From:      tx.From,
 		To:        tx.To,
@@ -219,7 +171,7 @@ func (h *Handler) GetBalance(c *gin.Context) {
 
 	balance := h.blockchain.GetBalance(address)
 
-	resp := BalanceResponse{
+	resp := types.BalanceResponse{
 		Address: address,
 		Balance: strconv.Itoa(balance),
 	}
@@ -236,18 +188,20 @@ func (h *Handler) GetNonce(c *gin.Context) {
 	}
 
 	nonce := h.blockchain.GetNonce(address)
-	c.JSON(http.StatusOK, gin.H{
-		"address": address,
-		"nonce":   nonce,
-	})
+	resp := types.NonceResponse{
+		Address: address,
+		Nonce:   int(nonce),
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetStateRoot handles state root retrieval
 func (h *Handler) GetStateRoot(c *gin.Context) {
 	stateRoot := h.blockchain.GetStateRoot()
-	c.JSON(http.StatusOK, gin.H{
-		"stateRoot": stateRoot,
-	})
+	resp := types.StateRootResponse{
+		StateRoot: stateRoot,
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // CreateBlock handles block creation requests
@@ -257,7 +211,9 @@ func (h *Handler) CreateBlock(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	c.JSON(http.StatusOK, types.APIResponse{
+		Status: "success",
+	})
 }
 
 // GetBlockchainInfo returns information about the blockchain
@@ -293,14 +249,14 @@ func (h *Handler) GetTransactionPool(c *gin.Context) {
 func (h *Handler) GetAllBlocks(c *gin.Context) {
 	blocks := h.blockchain.GetAllBlocks()
 
-	var response []BlockResponse
+	var response []types.BlockResponse
 	for _, block := range blocks {
 		blockHash := block.ComputeHash()
 		prevHash := block.Header.PrevHash
 
-		var transactions []TransactionResponse
+		var transactions []types.TransactionResponse
 		for _, tx := range block.Transactions {
-			transactions = append(transactions, TransactionResponse{
+			transactions = append(transactions, types.TransactionResponse{
 				Hash:      hex.EncodeToString(tx.Hash[:]),
 				From:      tx.From,
 				To:        tx.To,
@@ -311,7 +267,7 @@ func (h *Handler) GetAllBlocks(c *gin.Context) {
 			})
 		}
 
-		response = append(response, BlockResponse{
+		response = append(response, types.BlockResponse{
 			Height:           block.Header.Height,
 			Hash:             hex.EncodeToString(blockHash[:]),
 			PrevHash:         hex.EncodeToString(prevHash[:]),
@@ -323,10 +279,12 @@ func (h *Handler) GetAllBlocks(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"data": gin.H{
-			"blocks": response,
+	apiResponse := types.BlocksResponse{
+		Status: "success",
+		Data: types.BlocksData{
+			Blocks: response,
 		},
-	})
+	}
+
+	c.JSON(http.StatusOK, apiResponse)
 }
