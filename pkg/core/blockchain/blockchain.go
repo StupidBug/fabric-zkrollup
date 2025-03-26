@@ -17,27 +17,41 @@ import (
 	"github.com/StupidBug/fabric-zkrollup/pkg/zk"
 )
 
+const (
+	maxTransactions = 0
+	debug           = true
+)
+
 // Blockchain represents the blockchain
 type Blockchain struct {
-	mu         sync.RWMutex // protects blocks and autoBlock
-	blocks     []*block.Block
-	state      *state.State
-	txPool     *txpool.TxPool
-	merkleTree *crypto.MerkleTree // 当前区块的 Merkle 树
-	autoBlock  bool
+	mu          sync.RWMutex // protects blocks and autoBlock
+	blocks      []*block.Block
+	state       *state.State
+	txPool      *txpool.TxPool
+	merkleTree  *crypto.MerkleTree // 当前区块的 Merkle 树
+	createBlock chan struct{}
+	autoBlock   bool
 }
 
 // NewBlockchain creates a new blockchain instance
 func NewBlockchain() *Blockchain {
+	callback := make(chan struct{})
 	bc := &Blockchain{
-		blocks:     make([]*block.Block, 0),
-		state:      state.NewState(),
-		txPool:     txpool.NewTxPool(),
-		merkleTree: crypto.NewMerkleTree(nil),
-		autoBlock:  false,
+		blocks:      make([]*block.Block, 0),
+		state:       state.NewState(),
+		txPool:      txpool.NewTxPool(callback),
+		merkleTree:  crypto.NewMerkleTree(nil),
+		createBlock: callback,
+		autoBlock:   false,
 	}
 
-	accounts := chaincode.GetAllTokenBalances()
+	var accounts []zk.Account
+	if debug {
+		accounts = chaincode.MockBalance()
+	} else {
+		accounts = chaincode.GetAllTokenBalances()
+	}
+
 	sort.Slice(accounts, func(i, j int) bool {
 		return accounts[i].Address < accounts[j].Address
 	})
@@ -130,6 +144,10 @@ func (bc *Blockchain) AddTransaction(tx transaction.Transaction) error {
 	bc.mu.Lock()
 	bc.txPool.Add(tx)
 	bc.mu.Unlock()
+
+	if bc.txPool.Size() > maxTransactions {
+		bc.createBlock <- struct{}{}
+	}
 
 	log.Printf("Added transaction %s to pool", tx.String())
 	return nil
@@ -323,19 +341,9 @@ func (bc *Blockchain) StartAutoBlock() {
 		// Start a goroutine to monitor transaction pool
 		go func() {
 			for {
-				time.Sleep(100 * time.Millisecond) // Check every 100ms
-
-				bc.mu.RLock()
-				autoBlockEnabled := bc.autoBlock
-				bc.mu.RUnlock()
-
-				if !autoBlockEnabled {
-					return
-				}
-
-				if bc.txPool.Size() > 1 {
-					checkAndCreateBlock()
-				}
+				log.Printf("start create block when reach max transaction")
+				<-bc.createBlock
+				checkAndCreateBlock()
 			}
 		}()
 
@@ -401,7 +409,10 @@ func (bc *Blockchain) applyTransactions(block *block.Block) (string, error) {
 		return "", fmt.Errorf("failed to generate ZK proof [req: %#v]: %v", input, err)
 	}
 
-	chaincode.JsonVerify(output)
+	if debug {
+	} else {
+		chaincode.JsonVerify(output)
+	}
 
 	// 更新交易状态
 	for i := range block.Transactions {
@@ -419,26 +430,6 @@ func (bc *Blockchain) applyTransactions(block *block.Block) (string, error) {
 
 	fmt.Println("output.NewStateRoot: ", output.NewStateRoot)
 	return output.NewStateRoot, nil
-}
-
-// ResetState resets the blockchain state
-func (bc *Blockchain) ResetState() {
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
-
-	// Reset blocks
-	bc.blocks = make([]*block.Block, 0)
-
-	// Reset state
-	bc.state = state.NewState()
-
-	// Reset transaction pool
-	bc.txPool = txpool.NewTxPool()
-
-	// Reset Merkle tree
-	bc.merkleTree = crypto.NewMerkleTree(nil)
-
-	log.Println("Blockchain state has been reset")
 }
 
 // GetPublicKey returns the public key for an address

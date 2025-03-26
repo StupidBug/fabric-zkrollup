@@ -1,9 +1,10 @@
 package main
 
 import (
+	"log"
+
 	"github.com/StupidBug/fabric-zkrollup/pkg/api/router"
 	"github.com/StupidBug/fabric-zkrollup/pkg/core/blockchain"
-	"log"
 )
 
 func main() {

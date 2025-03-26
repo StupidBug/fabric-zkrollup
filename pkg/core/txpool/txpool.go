@@ -13,7 +13,7 @@ type TxPool struct {
 }
 
 // NewTxPool creates a new transaction pool
-func NewTxPool() *TxPool {
+func NewTxPool(callback chan<- struct{}) *TxPool {
 	return &TxPool{
 		transactions: make([]transaction.Transaction, 0),
 	}
@@ -23,7 +23,6 @@ func NewTxPool() *TxPool {
 func (p *TxPool) Add(tx transaction.Transaction) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
 	p.transactions = append(p.transactions, tx)
 }
 
