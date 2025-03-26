@@ -11,6 +11,7 @@ import (
 	"github.com/StupidBug/fabric-zkrollup/pkg/chaincode"
 	"github.com/StupidBug/fabric-zkrollup/pkg/core/txpool"
 	"github.com/StupidBug/fabric-zkrollup/pkg/crypto"
+	"github.com/StupidBug/fabric-zkrollup/pkg/mock"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/block"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/state"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
@@ -47,7 +48,7 @@ func NewBlockchain() *Blockchain {
 
 	var accounts []zk.Account
 	if debug {
-		accounts = chaincode.MockBalance()
+		accounts = mock.MockBalance()
 	} else {
 		accounts = chaincode.GetAllTokenBalances()
 	}

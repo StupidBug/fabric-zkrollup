@@ -124,26 +124,6 @@ type TokenBalance struct {
 	Balance  int    `json:"balance"`
 }
 
-func MockBalance() []zk.Account {
-	return []zk.Account{
-		{
-			Address: "0000000000000000000000000000000000000001",
-			Balance: 1000000,
-			Nonce:   0,
-		},
-		{
-			Address: "0000000000000000000000000000000000000002",
-			Balance: 500000,
-			Nonce:   0,
-		},
-		{
-			Address: "0000000000000000000000000000000000000003",
-			Balance: 300000,
-			Nonce:   0,
-		},
-	}
-}
-
 func GetAllTokenBalances() (accounts []zk.Account) {
 	contract := connectToNetwork()
 	log.Println("--> Submit Transaction: GetAllTokenBalances")
