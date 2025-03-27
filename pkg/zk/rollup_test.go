@@ -12,43 +12,12 @@ import (
 func TestRollup(t *testing.T) {
 	// 创建固定的账户状态
 	accounts := mock.MockBalance()
+	transactions := mock.MockTransaction()
 	fmt.Printf("accounts: %#v\n", accounts)
 
 	// 计算旧状态根
 	old_merkleRoot := ComputeAccountMerkleRoot(accounts)
 	fmt.Printf("old_merkleRoot: %v\n", old_merkleRoot)
-
-	// 创建固定的交易序列
-	transactions := []types.Transaction{
-		{
-			From:   "0000000000000000000000000000000000000001",
-			To:     "0000000000000000000000000000000000000002",
-			Amount: 1,
-			Nonce:  0,
-		},
-		{
-			From:   "0000000000000000000000000000000000000001",
-			To:     "0000000000000000000000000000000000000002",
-			Amount: 1,
-			Nonce:  1,
-		},
-		{
-			From:   "0000000000000000000000000000000000000001",
-			To:     "0000000000000000000000000000000000000002",
-			Amount: 1,
-			Nonce:  2,
-		},
-	}
-	for i := 3; i < 33; i++ {
-		transactions = append(transactions,
-			types.Transaction{
-				From:   "0000000000000000000000000000000000000001",
-				To:     "0000000000000000000000000000000000000002",
-				Amount: 1,
-				Nonce:  i,
-			},
-		)
-	}
 
 	input := ProofInput{
 		OldStateRoot: old_merkleRoot,

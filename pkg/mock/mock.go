@@ -26,6 +26,22 @@ func MockBalance() []types.Account {
 	return accounts
 }
 
+// MockBalance 返回用于测试的初始账户状态
+func MockTransaction() []types.Transaction {
+	var transactions []types.Transaction
+	for i := 0; i < 512; i++ {
+		transactions = append(transactions,
+			types.Transaction{
+				From:   "0000000000000000000000000000000000000001",
+				To:     "0000000000000000000000000000000000000002",
+				Amount: 1,
+				Nonce:  i,
+			},
+		)
+	}
+	return transactions
+}
+
 // TestAccount 表示一个测试账户，包含私钥和公钥信息
 type TestAccount struct {
 	Address    string
