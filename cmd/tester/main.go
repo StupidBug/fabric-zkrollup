@@ -22,11 +22,10 @@ import (
 const (
 	baseURL = "http://localhost:8080/api/v1"
 
-	transferAmount  = 1
 	numTransactions = 100 // 增加到1000笔交易
 	maxRetries      = 10
 	retryInterval   = 3 * time.Second
-	batchSize       = 50  // 每批次发送50笔交易
+	batchSize       = 1   // 每批次发送50笔交易
 	batchInterval   = 100 // 批次间隔100毫秒
 )
 

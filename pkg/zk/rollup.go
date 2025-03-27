@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/big"
 	"math/rand"
 	"strconv"
@@ -75,7 +74,7 @@ func (circuit *merkleCircuit) Define(curveID ecc.ID, api frontend.API) error {
 	old_stateHasher, _ := mimc.NewMiMC("seed", curveID, api)
 	// 计算每个余额的哈希值
 
-	api.Println("接收账户地址总共", len(circuit.Balances))
+	// api.Println("接收账户地址总共", len(circuit.Balances))
 	old_hashes := make([]frontend.Variable, len(circuit.Balances))
 	for i := 0; i < len(circuit.Balances); i++ {
 		old_stateHasher.Reset()
@@ -190,7 +189,7 @@ func computeMerkleRoot(balances []int) string {
 		// log.Println(hashes[i])
 	}
 
-	log.Println("总共哈希数量:", len(hashes))
+	// log.Println("总共哈希数量:", len(hashes))
 
 	// 两两哈希直到只剩下一个值
 	for len(hashes) > 1 {
@@ -283,9 +282,9 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 	// 构建默克尔证明
 	proofIndex := uint64(rand.Intn(batchSize))
 	merkleRoot, _, _, err := merkletree.BuildReaderProof(&buf, bn254.NewMiMC("seed"), batchSize, proofIndex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build merkle proof: %v", err)
-	}
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to build merkle proof: %v", err)
+	// }
 
 	// proofHelper := merkle.GenerateProofHelper(merkleProof, proofIndex, numLeaves)
 
@@ -328,7 +327,7 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 
 	// 计算新状态根
 	merkleRoot1 := ComputeAccountMerkleRoot(accounts)
-	fmt.Printf("merkleRoot1: %v\n", merkleRoot1)
+	// fmt.Printf("merkleRoot1: %v\n", merkleRoot1)
 
 	// 创建witness
 	witness := &merkleCircuit{
@@ -472,7 +471,7 @@ func (p *ProofOutput) UnmarshalJSON(data []byte) error {
 // 验证证明
 func VerifyProof(proofStr string) error {
 	// 打印proofStr
-	fmt.Printf("proofStr: %v\n", proofStr)
+	// fmt.Printf("proofStr: %v\n", proofStr)
 	// 反序列化输入
 	var output ProofOutput
 	err := json.Unmarshal([]byte(proofStr), &output)

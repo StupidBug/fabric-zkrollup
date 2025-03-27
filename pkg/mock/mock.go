@@ -1,10 +1,16 @@
 package mock
 
 import (
+	"math/rand/v2"
+
 	"github.com/StupidBug/fabric-zkrollup/pkg/api/types"
 )
 
-const AccountsNum = 20
+const (
+	AccountsNum    = 20
+	TransactionNum = 128
+	RandomValue    = 10
+)
 
 // MockBalance 返回用于测试的初始账户状态
 func MockBalance() []types.Account {
@@ -19,7 +25,7 @@ func MockBalance() []types.Account {
 		}
 		accounts = append(accounts, types.Account{
 			Address: address,
-			Balance: 500000,
+			Balance: 500000 + rand.IntN(RandomValue),
 			Nonce:   0,
 		})
 	}
@@ -29,12 +35,12 @@ func MockBalance() []types.Account {
 // MockBalance 返回用于测试的初始账户状态
 func MockTransaction() []types.Transaction {
 	var transactions []types.Transaction
-	for i := 0; i < 512; i++ {
+	for i := 0; i < TransactionNum; i++ {
 		transactions = append(transactions,
 			types.Transaction{
 				From:   "0000000000000000000000000000000000000001",
 				To:     "0000000000000000000000000000000000000002",
-				Amount: 1,
+				Amount: 1 + rand.IntN(RandomValue),
 				Nonce:  i,
 			},
 		)
