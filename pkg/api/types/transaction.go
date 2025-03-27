@@ -18,7 +18,7 @@ type Signature struct {
 type TransactionRequest struct {
 	From      string    `json:"from" binding:"required"`
 	To        string    `json:"to" binding:"required"`
-	Value     string    `json:"value" binding:"required"`
+	Value     int       `json:"value" binding:"required"`
 	Nonce     string    `json:"nonce" binding:"required"`
 	Signature Signature `json:"signature" binding:"required"`
 	PublicKey PublicKey `json:"publicKey" binding:"required"`

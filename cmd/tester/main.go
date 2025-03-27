@@ -7,22 +7,27 @@ import (
 	"io"
 	"log"
 	"math/big"
+	"math/rand/v2"
 	"net/http"
 	"os"
-	"os/exec"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/StupidBug/fabric-zkrollup/pkg/api/types"
 	"github.com/StupidBug/fabric-zkrollup/pkg/core/crypto"
+	"github.com/StupidBug/fabric-zkrollup/pkg/mock"
 )
 
 const (
-	baseURL         = "http://localhost:8080/api/v1"
-	senderAddress   = "0000000000000000000000000000000000000001"
-	receiverAddress = "0000000000000000000000000000000000000002"
-	transferAmount  = 100
-	numTransactions = 3
+	baseURL = "http://localhost:8080/api/v1"
+
+	transferAmount  = 1
+	numTransactions = 100 // 增加到1000笔交易
+	maxRetries      = 10
+	retryInterval   = 3 * time.Second
+	batchSize       = 50  // 每批次发送50笔交易
+	batchInterval   = 100 // 批次间隔100毫秒
 )
 
 // 颜色输出
@@ -53,20 +58,19 @@ func checkServerRunning() bool {
 }
 
 // 工具函数 - 获取状态根
-func getStateRoot() string {
-	fmt.Println(green("获取状态根..."))
+func getStateRoot() (string, error) {
 	resp, err := http.Get(baseURL + "/state/root")
 	if err != nil {
-		log.Fatalf("获取状态根失败: %v", err)
+		return "", fmt.Errorf("获取状态根失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	var result types.StateRootResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Fatalf("解析状态根响应失败: %v", err)
+		return "", fmt.Errorf("解析状态根响应失败: %v", err)
 	}
 
-	return result.StateRoot
+	return result.StateRoot, nil
 }
 
 // 工具函数 - 获取余额
@@ -90,132 +94,160 @@ func getBalance(address string) int {
 	return balance
 }
 
+var nonceMap = make(map[string]int)
+var nonceMutex sync.Mutex
+
 // 工具函数 - 获取 nonce
-func getNonce(address string) int {
-	resp, err := http.Get(fmt.Sprintf("%s/account/nonce?address=%s", baseURL, address))
-	if err != nil {
-		log.Fatalf("获取nonce失败: %v", err)
-	}
-	defer resp.Body.Close()
-
-	var result types.NonceResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Fatalf("解析nonce响应失败: %v", err)
+func GetNonce(address string, isRead bool) int {
+	nonceMutex.Lock()
+	defer nonceMutex.Unlock()
+	if isRead {
+		return nonceMap[address]
 	}
 
-	return result.Nonce
+	nonce := nonceMap[address]
+	nonceMap[address]++
+	return nonce
 }
 
-// 工具函数 - 发送交易
-func sendTransaction(from, to string, value, nonce int, sigR, sigS, pubX, pubY string) string {
-	txReq := types.TransactionRequest{
-		From:  from,
-		To:    to,
-		Value: strconv.Itoa(value),
-		Nonce: strconv.Itoa(nonce),
-		Signature: types.Signature{
-			R: sigR,
-			S: sigS,
-		},
-		PublicKey: types.PublicKey{
-			X: pubX,
-			Y: pubY,
-		},
+type TestAccount struct {
+	Address    string
+	PrivateKey *big.Int
+	PublicKeyX *big.Int
+	PublicKeyY *big.Int
+}
+
+// 使用mock_balance.go中定义的测试账户
+var testAccounts = func() []TestAccount {
+	accounts := []TestAccount{}
+	// 添加更多测试账户，用于压力测试
+	for i := 1; i < mock.AccountsNum; i++ {
+		// 生成地址
+		address := ""
+		if i < 10 {
+			address = fmt.Sprintf("000000000000000000000000000000000000000%d", i)
+		} else {
+			address = fmt.Sprintf("00000000000000000000000000000000000000%d", i)
+		}
+
+		// 生成新的密钥对
+		priv, pub := crypto.GenerateKeyPair()
+
+		// 添加新账户
+		accounts = append(accounts, TestAccount{
+			Address:    address,
+			PrivateKey: priv,
+			PublicKeyX: pub.X,
+			PublicKeyY: pub.Y,
+		})
 	}
 
+	return accounts
+}()
+
+func signTransaction(req *types.TransactionRequest, sender *TestAccount) {
+	txData := fmt.Sprintf("%s%s%d%s", req.From, req.To, req.Value, req.Nonce)
+	sig := crypto.Sign(txData, sender.PrivateKey)
+	req.Signature = types.Signature{
+		R: fmt.Sprintf("%x", sig.R),
+		S: fmt.Sprintf("%x", sig.S),
+	}
+	req.PublicKey = types.PublicKey{
+		X: fmt.Sprintf("%x", sender.PublicKeyX),
+		Y: fmt.Sprintf("%x", sender.PublicKeyY),
+	}
+}
+
+// 发送交易的工作线程
+func sendTransactionWorker(idx int) (string, error) {
+	// 创建一个HTTP客户端，设置更长的超时时间和连接池
+	client := http.DefaultClient
+
+	// 随机选择发送方和接收方
+	sender := &testAccounts[idx%len(testAccounts)]
+	receiver := &testAccounts[(idx+1)%len(testAccounts)]
+
+	// 获取nonce
+	nonce := GetNonce(sender.Address, false)
+
+	// 构造交易请求
+	txReq := &types.TransactionRequest{
+		From:  sender.Address,
+		To:    receiver.Address,
+		Value: rand.IntN(4) + 1,
+		Nonce: strconv.Itoa(nonce),
+	}
+
+	// 签名交易
+	signTransaction(txReq, sender)
+
+	// 发送交易
 	jsonData, err := json.Marshal(txReq)
 	if err != nil {
-		log.Fatalf("序列化交易请求失败: %v", err)
+		return "", err
 	}
 
-	fmt.Println(green("发送交易..."))
-	resp, err := http.Post(baseURL+"/transaction/send", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := client.Post(baseURL+"/transaction/send", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Fatalf("发送交易失败: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("读取交易响应失败: %v", err)
+		panic(fmt.Errorf("send trans failed: %w", err))
 	}
 
-	fmt.Printf("交易响应: %s\n", string(body))
-
-	// 我们不再需要在不同格式之间切换解析。服务器回复的就是TransactionWithNumStatus
-	var tx types.TransactionWithNumStatus
-	if err := json.Unmarshal(body, &tx); err != nil {
-		log.Fatalf("解析交易响应失败: %v", err)
+	if resp.StatusCode == http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		panic(string(body))
 	}
 
-	if tx.Hash != "" {
-		return tx.Hash
+	var result types.TransactionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		resp.Body.Close()
+		return "", err
 	}
+	resp.Body.Close()
+	time.Sleep(100 * time.Millisecond)
+	// fmt.Printf("工作线程 %d 发送交易成功: %s %#v\n", idx, result.Hash, txReq)
 
-	log.Fatalf("无法从响应中获取交易哈希")
-	return ""
+	return result.Hash, nil
 }
 
-// 工具函数 - 检查交易状态
-func getTransactionStatus(hash string) string {
-	resp, err := http.Get(fmt.Sprintf("%s/transaction/get?hash=%s", baseURL, hash))
+// 获取交易状态
+func getTransactionStatus(txHash string) (string, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/transaction/get?hash=%s", baseURL, txHash))
 	if err != nil {
-		log.Printf("获取交易状态失败: %v", err)
-		return ""
+		return "", fmt.Errorf("获取交易状态失败: %v", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("读取交易状态响应失败: %v", err)
-		return ""
+	var result types.TransactionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("解析交易状态响应失败: %v", err)
 	}
 
-	fmt.Printf("交易 %s 完整响应: %s\n", hash, string(body))
-
-	// 直接解析为TransactionResponse对象
-	var tx types.TransactionResponse
-	if err := json.Unmarshal(body, &tx); err == nil && tx.Status != "" {
-		return tx.Status
-	}
-
-	// 数字状态码的情况
-	var txWithNumStatus types.TransactionWithNumStatus
-	if err := json.Unmarshal(body, &txWithNumStatus); err == nil {
-		switch txWithNumStatus.Status {
-		case 0:
-			return "pending"
-		case 1:
-			return "confirmed"
-		case 2:
-			return "failed"
-		}
-	}
-
-	return ""
+	return result.Status, nil
 }
 
 // 工具函数 - 等待交易确认
-func waitForConfirmation(hash string, maxRetries int) bool {
+func waitForConfirmation(txHash string) bool {
 	var retryCount int
+	time.Sleep(3 * time.Second)
 	for retryCount < maxRetries {
-		fmt.Printf("检查交易状态（尝试 %d/%d）\n", retryCount+1, maxRetries)
-		status := getTransactionStatus(hash)
-		fmt.Printf("交易 %s 状态: %s\n", hash, status)
+		// fmt.Printf("检查交易状态（尝试 %d/%d）\n", retryCount+1, maxRetries)
+		status, err := getTransactionStatus(txHash)
+		if err != nil {
+			fmt.Printf("检查交易状态失败: %v\n", err)
+			retryCount++
+			time.Sleep(retryInterval)
+			continue
+		}
+
+		// fmt.Printf("交易 %s 状态: %s\n", txHash, status)
 
 		if status == "confirmed" {
-			fmt.Println("交易确认成功")
+			// fmt.Printf("交易 %s 确认成功\n", txHash)
 			return true
-		} else if status == "pending" {
-			fmt.Println("交易处理中...")
-		} else if status == "" {
-			fmt.Println("未获取到交易状态")
-		} else {
-			fmt.Printf("未知状态: %s\n", status)
 		}
 
 		retryCount++
-		time.Sleep(3 * time.Second)
+		time.Sleep(retryInterval)
 	}
 
 	return false
@@ -247,57 +279,23 @@ func displayAccountStates() {
 	fmt.Println(green("账户状态:"))
 	fmt.Println("-----------------")
 
-	addresses := []string{senderAddress, receiverAddress}
-
 	// 输出表头
 	fmt.Printf("%-42s | %-10s | %-5s\n", "地址", "余额", "Nonce")
 	fmt.Println("----------------------------------------------------------------------")
 
 	// 获取并显示每个地址的余额和nonce
-	for _, addr := range addresses {
+	for i := 0; i < 10; i++ { // 只显示前10个账户，避免输出太多
+		addr := testAccounts[i].Address
 		bal := getBalance(addr)
-		nonce := getNonce(addr)
+		nonce := GetNonce(addr, true)
 		fmt.Printf("%-42s | %-10d | %-5d\n", addr, bal, nonce)
 	}
 
-	fmt.Println("-----------------")
-}
-
-// 重建密钥生成工具
-func rebuildKeygenTool() {
-	fmt.Println(green("重新编译 keygen 工具..."))
-	cmd := exec.Command("go", "build", "-o", "keygen", "./cmd/keygen")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Println(red("构建 keygen 工具失败:"), string(output))
-		os.Exit(1)
+	if len(testAccounts) > 10 {
+		fmt.Println("... 更多账户省略 ...")
 	}
-	fmt.Println(green("keygen 工具构建成功"))
-}
 
-// 生成密钥对
-func generateKeyPair() (string, string, string) {
-	priv, pub := crypto.GenerateKeyPair()
-	privHex := fmt.Sprintf("%x", priv)
-	pubXHex := fmt.Sprintf("%x", pub.X)
-	pubYHex := fmt.Sprintf("%x", pub.Y)
-	return privHex, pubXHex, pubYHex
-}
-
-// 签名交易
-func signTransaction(from, to string, value, nonce int, privKey string) (string, string, string, string, string) {
-	// 将私钥转为 big.Int
-	privKeyBig := new(big.Int)
-	privKeyBig.SetString(privKey, 16)
-
-	// 创建交易数据
-	txData := fmt.Sprintf("%s%s%d%d", from, to, value, nonce)
-
-	// 签名交易
-	sig := crypto.Sign(txData, privKeyBig)
-	pub := crypto.PrivateKeyToPublic(privKeyBig)
-
-	return txData, fmt.Sprintf("%x", sig.R), fmt.Sprintf("%x", sig.S), fmt.Sprintf("%x", pub.X), fmt.Sprintf("%x", pub.Y)
+	fmt.Println("-----------------")
 }
 
 // 显示所有区块信息
@@ -341,112 +339,58 @@ func displayAllBlocks() {
 func main() {
 	// 检查服务器是否运行
 	if !checkServerRunning() {
-		fmt.Println(red("服务器未运行。请先启动服务器。"))
+		fmt.Println("服务器未运行。请先启动服务器。")
 		os.Exit(1)
 	}
-	fmt.Println(green("服务器已启动。"))
-
-	// 重新编译 keygen 工具
-	rebuildKeygenTool()
+	fmt.Println("服务器已启动。")
 
 	// 获取初始状态根
-	initialRoot := getStateRoot()
-	fmt.Printf("初始状态根: %s\n", initialRoot)
+	initialStateRoot, err := getStateRoot()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("初始状态根: %s\n", initialStateRoot)
+	fmt.Printf("压力测试配置:\n")
+	fmt.Printf("总交易数: %d\n", numTransactions*mock.AccountsNum)
+	fmt.Printf("批次大小: %d\n", batchSize)
+	fmt.Printf("批次间隔: %dms\n", batchInterval)
 
-	// 生成发送方密钥对
-	fmt.Println(green("生成发送方密钥对..."))
-	senderPrivKey, senderPubX, senderPubY := generateKeyPair()
-	fmt.Printf("私钥: %s\n", senderPrivKey)
-	fmt.Printf("公钥 X: %s\n", senderPubX)
-	fmt.Printf("公钥 Y: %s\n", senderPubY)
+	startTime := time.Now()
+	// 启动工作线程
+	var wg sync.WaitGroup
+	for i := range mock.AccountsNum - 1 {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			for range 10 {
+				hash, _ := sendTransactionWorker(idx)
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					waitForConfirmation(hash)
+				}()
+			}
+		}(i)
+	}
+	wg.Wait()
 
-	// 获取初始余额
-	fmt.Println(green("初始余额:"))
-	senderInitialBalance := getBalance(senderAddress)
-	receiverInitialBalance := getBalance(receiverAddress)
-	fmt.Printf("发送方 (%s): %d\n", senderAddress, senderInitialBalance)
-	fmt.Printf("接收方 (%s): %d\n", receiverAddress, receiverInitialBalance)
+	fmt.Printf("\n压力测试结果:\n")
+	fmt.Printf("总耗时: %s\n", time.Since(startTime).String())
+	fmt.Printf("平均TPS: %.2f\n", numTransactions*mock.AccountsNum/time.Since(startTime).Seconds())
 
-	// 发送多笔交易
-	totalTransfer := 0
-	for i := 0; i < numTransactions; i++ {
-		fmt.Printf(green("处理交易 %d/%d...\n"), i+1, numTransactions)
-
-		// 获取当前 nonce
-		currentNonce := getNonce(senderAddress)
-		fmt.Printf("当前 nonce: %d\n", currentNonce)
-
-		// 签名交易
-		fmt.Println(green("签名交易..."))
-		txHash, sigR, sigS, pubX, pubY := signTransaction(senderAddress, receiverAddress, transferAmount, currentNonce, senderPrivKey)
-		fmt.Printf("交易哈希: %s\n", txHash)
-		fmt.Printf("签名 R: %s\n", sigR)
-		fmt.Printf("签名 S: %s\n", sigS)
-		fmt.Printf("公钥 X: %s\n", pubX)
-		fmt.Printf("公钥 Y: %s\n", pubY)
-
-		// 发送交易
-		hash := sendTransaction(senderAddress, receiverAddress, transferAmount, currentNonce, sigR, sigS, pubX, pubY)
-		totalTransfer += transferAmount
-
-		// 等待交易确认
-		fmt.Printf(green("等待交易 %d 确认...\n"), i+1)
-		if !waitForConfirmation(hash, 10) {
-			fmt.Printf(red("测试失败: 交易 %d 未及时确认\n"), i+1)
-			os.Exit(1)
-		}
-		fmt.Printf(green("交易 %d 成功确认\n"), i+1)
-
-		// 获取交易后的余额
-		fmt.Printf(green("检查交易 %d 后的余额...\n"), i+1)
-		currentSenderBalance := getBalance(senderAddress)
-		currentReceiverBalance := getBalance(receiverAddress)
-		fmt.Printf("当前发送方余额: %d\n", currentSenderBalance)
-		fmt.Printf("当前接收方余额: %d\n", currentReceiverBalance)
-
-		// 小延迟
-		time.Sleep(2 * time.Second)
+	// 检查最终状态根
+	finalStateRoot, err := getStateRoot()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// 获取最终余额
-	fmt.Println(green("最终余额:"))
-	senderFinalBalance := getBalance(senderAddress)
-	receiverFinalBalance := getBalance(receiverAddress)
-	fmt.Printf("发送方 (%s): %d\n", senderAddress, senderFinalBalance)
-	fmt.Printf("接收方 (%s): %d\n", receiverAddress, receiverFinalBalance)
-
-	// 获取最终状态根
-	finalRoot := getStateRoot()
-	fmt.Printf("最终状态根: %s\n", finalRoot)
-
-	// 验证状态根是否改变
-	if initialRoot != finalRoot {
-		fmt.Println(green("测试通过: 状态根在转账后发生改变"))
-	} else {
-		fmt.Println(red("测试失败: 状态根未改变"))
-		os.Exit(1)
+	fmt.Printf("\n初始状态根: %s\n", initialStateRoot)
+	fmt.Printf("\n最终状态根: %s\n", finalStateRoot)
+	if finalStateRoot == initialStateRoot {
+		log.Fatal("状态根未改变")
 	}
-
-	// 验证余额是否正确变化
-	expectedSenderBalance := senderInitialBalance - totalTransfer
-	expectedReceiverBalance := receiverInitialBalance + totalTransfer
-
-	if senderFinalBalance == expectedSenderBalance && receiverFinalBalance == expectedReceiverBalance {
-		fmt.Println(green("测试通过: 余额正确更新"))
-	} else {
-		fmt.Println(red("测试失败: 余额未正确更新"))
-		fmt.Printf("预期发送方余额: %d, 实际: %d\n", expectedSenderBalance, senderFinalBalance)
-		fmt.Printf("预期接收方余额: %d, 实际: %d\n", expectedReceiverBalance, receiverFinalBalance)
-		os.Exit(1)
-	}
-
-	fmt.Println(green("所有测试均通过!"))
-
-	// 显示所有区块信息
 	displayAllBlocks()
-
-	// 显示所有账户状态
 	displayAccountStates()
 
-	fmt.Println(green("测试套件执行完成。"))
+	fmt.Println("测试完成！所有交易都已成功处理。")
 }

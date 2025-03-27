@@ -32,13 +32,6 @@ func (h *Handler) SendTransaction(c *gin.Context) {
 		return
 	}
 
-	// Parse value
-	value, err := strconv.Atoi(req.Value)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid value"})
-		return
-	}
-
 	// Parse nonce
 	nonce, err := strconv.ParseUint(req.Nonce, 10, 64)
 	if err != nil {
@@ -84,7 +77,7 @@ func (h *Handler) SendTransaction(c *gin.Context) {
 	tx := transaction.Transaction{
 		From:      req.From,
 		To:        req.To,
-		Value:     value,
+		Value:     req.Value,
 		Nonce:     nonce,
 		Status:    transaction.StatusPending,
 		Timestamp: time.Now().Unix(),
@@ -103,14 +96,14 @@ func (h *Handler) SendTransaction(c *gin.Context) {
 		return
 	}
 
-	// Create response as types.TransactionWithNumStatus
-	resp := types.TransactionWithNumStatus{
+	// Create response
+	resp := types.TransactionResponse{
 		Hash:      hex.EncodeToString(tx.Hash[:]),
 		From:      tx.From,
 		To:        tx.To,
-		Value:     tx.Value,
+		Value:     strconv.Itoa(tx.Value),
 		Nonce:     tx.Nonce,
-		Status:    int(tx.Status),
+		Status:    tx.Status.String(),
 		Timestamp: tx.Timestamp,
 		Signature: types.Signature{
 			R: req.Signature.R,

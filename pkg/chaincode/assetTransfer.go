@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/StupidBug/fabric-zkrollup/pkg/api/types"
 	"github.com/StupidBug/fabric-zkrollup/pkg/zk"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
@@ -124,7 +125,7 @@ type TokenBalance struct {
 	Balance  int    `json:"balance"`
 }
 
-func GetAllTokenBalances() (accounts []zk.Account) {
+func GetAllTokenBalances() (accounts []types.Account) {
 	contract := connectToNetwork()
 	log.Println("--> Submit Transaction: GetAllTokenBalances")
 	result, err := contract.EvaluateTransaction("GetAllTokenBalances")
@@ -134,7 +135,7 @@ func GetAllTokenBalances() (accounts []zk.Account) {
 	var TokenBalances []TokenBalance
 	_ = json.Unmarshal(result, &TokenBalances)
 	for _, tb := range TokenBalances {
-		accounts = append(accounts, zk.Account{
+		accounts = append(accounts, types.Account{
 			Address: tb.ClientID,
 			Balance: tb.Balance,
 			Nonce:   0,

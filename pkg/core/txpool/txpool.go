@@ -13,7 +13,7 @@ type TxPool struct {
 }
 
 // NewTxPool creates a new transaction pool
-func NewTxPool(callback chan<- struct{}) *TxPool {
+func NewTxPool() *TxPool {
 	return &TxPool{
 		transactions: make([]transaction.Transaction, 0),
 	}
@@ -60,6 +60,26 @@ func (p *TxPool) GetAll() []transaction.Transaction {
 
 	txs := make([]transaction.Transaction, len(p.transactions))
 	copy(txs, p.transactions)
+	return txs
+}
+
+func (p *TxPool) Pop(num int) []transaction.Transaction {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if num > len(p.transactions) {
+		num = len(p.transactions)
+	}
+	txs := make([]transaction.Transaction, num)
+	copy(txs, p.transactions[:num])
+	p.transactions = p.transactions[num:]
+	return txs
+}
+
+func (p *TxPool) PopAll() []transaction.Transaction {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	txs := p.transactions
+	p.transactions = make([]transaction.Transaction, 0, 10)
 	return txs
 }
 

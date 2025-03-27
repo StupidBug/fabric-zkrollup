@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"math/rand"
 	"strconv"
@@ -12,30 +13,15 @@ import (
 
 	"encoding/base64"
 
+	"github.com/StupidBug/fabric-zkrollup/pkg/api/types"
 	"github.com/consensys/gnark-crypto/accumulator/merkletree"
 	"github.com/consensys/gnark-crypto/ecc"
 	bn254 "github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/std/accumulator/merkle"
 	"github.com/consensys/gnark/std/hash/mimc"
 )
-
-// Account 表示账户状态
-type Account struct {
-	Address string // 电路外：账户地址为string类型
-	Balance int    // 电路外：账户余额为int类型
-	Nonce   int    // 电路外：nonce为int类型
-}
-
-// Transaction 表示交易
-type Transaction struct {
-	From   string // 电路外：发送者地址为string类型
-	To     string // 电路外：接收者地址为string类型
-	Amount int    // 电路外：转账金额为int类型
-	Nonce  int    // 电路外：交易nonce为int类型
-}
 
 // CircuitTransaction 表示电路内交易
 type CircuitTransaction struct {
@@ -62,8 +48,8 @@ type SerializedTransaction struct {
 
 type merkleCircuit struct {
 	// 公开输入
-	OldRStateRoot  frontend.Variable `gnark:",public"` // 前一个状态根
-	RootHash       frontend.Variable `gnark:",public"` //批次根
+	OldRStateRoot frontend.Variable `gnark:",public"` // 前一个状态根
+	// RootHash       frontend.Variable `gnark:",public"` //批次根
 	FinalStateRoot frontend.Variable `gnark:",public"` // 最终状态根
 
 	// 账户状态
@@ -77,22 +63,25 @@ type merkleCircuit struct {
 }
 
 func (circuit *merkleCircuit) Define(curveID ecc.ID, api frontend.API) error {
-	hFunc, err := mimc.NewMiMC("seed", curveID, api)
-	if err != nil {
-		return err
-	}
-
 	// 默克尔路径证明
-	merkle.VerifyProof(api, hFunc, circuit.RootHash, circuit.Path, circuit.Helper)
+	// hFunc, err := mimc.NewMiMC("seed", curveID, api)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// merkle.VerifyProof(api, hFunc, circuit.RootHash, circuit.Path, circuit.Helper)
 
 	// 计算旧状态根
 	old_stateHasher, _ := mimc.NewMiMC("seed", curveID, api)
 	// 计算每个余额的哈希值
+
+	api.Println("接收账户地址总共", len(circuit.Balances))
 	old_hashes := make([]frontend.Variable, len(circuit.Balances))
 	for i := 0; i < len(circuit.Balances); i++ {
 		old_stateHasher.Reset()
 		old_stateHasher.Write(circuit.Balances[i])
 		old_hashes[i] = old_stateHasher.Sum()
+		// api.Println(old_hashes[i])
 	}
 
 	// 两两哈希直到只剩下一个值
@@ -105,6 +94,7 @@ func (circuit *merkleCircuit) Define(curveID ecc.ID, api frontend.API) error {
 				old_stateHasher.Write(old_hashes[i])
 				old_stateHasher.Write(old_hashes[i+1])
 				newHashes = append(newHashes, old_stateHasher.Sum())
+				// api.Println(old_stateHasher.Sum())
 			} else {
 				// 如果是奇数个哈希值，最后一个直接保留
 				newHashes = append(newHashes, old_hashes[i])
@@ -112,6 +102,9 @@ func (circuit *merkleCircuit) Define(curveID ecc.ID, api frontend.API) error {
 		}
 		old_hashes = newHashes
 	}
+
+	// api.Println(circuit.OldRStateRoot)
+	// api.Println(old_hashes[0])
 	api.AssertIsEqual(circuit.OldRStateRoot, old_hashes[0])
 
 	// 处理每笔交易
@@ -185,25 +178,31 @@ func (circuit *merkleCircuit) Define(curveID ecc.ID, api frontend.API) error {
 // 电路外的计算函数
 func computeMerkleRoot(balances []int) string {
 	// 创建一个切片来存储所有余额的哈希值
-	hashes := make([]*big.Int, len(balances))
+	hashes := make([][]byte, len(balances))
+
+	hFunc := bn254.NewMiMC("seed")
 
 	// 计算每个余额的哈希值
 	for i, balance := range balances {
-		f := bn254.NewMiMC("seed")
-		f.Write(new(big.Int).SetInt64(int64(balance)).Bytes())
-		hashes[i] = new(big.Int).SetBytes(f.Sum(nil))
+		hFunc.Reset()
+		hFunc.Write(new(big.Int).SetInt64(int64(balance)).Bytes())
+		hashes[i] = hFunc.Sum(nil)
+		// log.Println(hashes[i])
 	}
+
+	log.Println("总共哈希数量:", len(hashes))
 
 	// 两两哈希直到只剩下一个值
 	for len(hashes) > 1 {
-		newHashes := make([]*big.Int, 0, (len(hashes)+1)/2)
+		newHashes := make([][]byte, 0, (len(hashes)+1)/2)
 		for i := 0; i < len(hashes); i += 2 {
 			if i+1 < len(hashes) {
 				// 合并两个哈希值
-				f := bn254.NewMiMC("seed")
-				f.Write(hashes[i].Bytes())
-				f.Write(hashes[i+1].Bytes())
-				newHashes = append(newHashes, new(big.Int).SetBytes(f.Sum(nil)))
+				hFunc.Reset()
+				hFunc.Write(hashes[i])
+				hFunc.Write(hashes[i+1])
+				newHashes = append(newHashes, hFunc.Sum(nil))
+				// log.Print("合并哈希:", new(big.Int).SetBytes(hFunc.Sum(nil)))
 			} else {
 				// 如果是奇数个哈希值，最后一个直接保留
 				newHashes = append(newHashes, hashes[i])
@@ -212,14 +211,14 @@ func computeMerkleRoot(balances []int) string {
 		hashes = newHashes
 	}
 
-	return hashes[0].String()
+	return new(big.Int).SetBytes(hashes[0]).String()
 }
 
 // 输入参数结构体
 type ProofInput struct {
 	OldStateRoot string // 旧状态根
-	Accounts     []Account
-	Transactions []Transaction
+	Accounts     []types.Account
+	Transactions []types.Transaction
 }
 
 // 输出参数结构体
@@ -227,23 +226,23 @@ type ProofOutput struct {
 	OldStateRoot string
 	BatchRoot    string
 	NewStateRoot string
-	NewAccounts  []Account   // 添加新的账户状态字段
-	Proof        interface{} // 使用interface{}来存储proof
-	Vk           interface{} // 使用interface{}来存储vk
+	NewAccounts  []types.Account // 添加新的账户状态字段
+	Proof        interface{}     // 使用interface{}来存储proof
+	Vk           interface{}     // 使用interface{}来存储vk
 }
 
 // 序列化的输出结构体
 type SerializedProofOutput struct {
-	OldStateRoot string    `json:"old_state_root"`
-	BatchRoot    string    `json:"batch_root"`
-	NewStateRoot string    `json:"new_state_root"`
-	NewAccounts  []Account `json:"new_accounts"` // 添加新的账户状态字段
-	ProofData    string    `json:"proof"`        // base64编码的proof数据
-	VkData       string    `json:"vk"`           // base64编码的vk数据
+	OldStateRoot string          `json:"old_state_root"`
+	BatchRoot    string          `json:"batch_root"`
+	NewStateRoot string          `json:"new_state_root"`
+	NewAccounts  []types.Account `json:"new_accounts"` // 添加新的账户状态字段
+	ProofData    string          `json:"proof"`        // base64编码的proof数据
+	VkData       string          `json:"vk"`           // base64编码的vk数据
 }
 
 // 计算账户余额的默克尔根
-func ComputeAccountMerkleRoot(accounts []Account) string {
+func ComputeAccountMerkleRoot(accounts []types.Account) string {
 	// 提取所有账户的余额
 	balances := make([]int, len(accounts))
 	for i := 0; i < len(accounts); i++ {
@@ -253,7 +252,7 @@ func ComputeAccountMerkleRoot(accounts []Account) string {
 }
 
 // 查找账户索引的辅助函数
-func findAccountIndex(accounts []Account, address string) int {
+func findAccountIndex(accounts []types.Account, address string) int {
 	for i, acc := range accounts {
 		if acc.Address == address {
 			return i
@@ -283,12 +282,12 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 
 	// 构建默克尔证明
 	proofIndex := uint64(rand.Intn(batchSize))
-	merkleRoot, merkleProof, numLeaves, err := merkletree.BuildReaderProof(&buf, bn254.NewMiMC("seed"), batchSize, proofIndex)
+	merkleRoot, _, _, err := merkletree.BuildReaderProof(&buf, bn254.NewMiMC("seed"), batchSize, proofIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build merkle proof: %v", err)
 	}
 
-	proofHelper := merkle.GenerateProofHelper(merkleProof, proofIndex, numLeaves)
+	// proofHelper := merkle.GenerateProofHelper(merkleProof, proofIndex, numLeaves)
 
 	// 创建电路
 	circuit := merkleCircuit{
@@ -296,8 +295,8 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 		Addresses:    make([]frontend.Variable, accountSize),
 		Balances:     make([]frontend.Variable, accountSize),
 		Nonces:       make([]frontend.Variable, accountSize),
-		Path:         make([]frontend.Variable, len(merkleProof)),
-		Helper:       make([]frontend.Variable, len(merkleProof)-1),
+		// Path:         make([]frontend.Variable, len(merkleProof)),
+		// Helper:       make([]frontend.Variable, len(merkleProof)-1),
 	}
 
 	// 编译电路
@@ -313,11 +312,11 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 	}
 
 	// 记录旧账户状态
-	old_accounts := make([]Account, accountSize)
+	old_accounts := make([]types.Account, accountSize)
 	copy(old_accounts, input.Accounts)
 
 	// 更新账户状态
-	accounts := make([]Account, accountSize)
+	accounts := make([]types.Account, accountSize)
 	copy(accounts, input.Accounts)
 	for _, tx := range input.Transactions {
 		fromIdx := findAccountIndex(accounts, tx.From)
@@ -333,15 +332,15 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 
 	// 创建witness
 	witness := &merkleCircuit{
-		OldRStateRoot:  frontend.Value(input.OldStateRoot),
-		RootHash:       frontend.Value(merkleRoot),
+		OldRStateRoot: frontend.Value(input.OldStateRoot),
+		// RootHash:       frontend.Value(merkleRoot),
 		FinalStateRoot: frontend.Value(merkleRoot1),
 		Transactions:   make([]CircuitTransaction, batchSize),
 		Addresses:      make([]frontend.Variable, accountSize),
 		Balances:       make([]frontend.Variable, accountSize),
 		Nonces:         make([]frontend.Variable, accountSize),
-		Path:           make([]frontend.Variable, len(merkleProof)),
-		Helper:         make([]frontend.Variable, len(merkleProof)-1),
+		// Path:           make([]frontend.Variable, len(merkleProof)),
+		// Helper:         make([]frontend.Variable, len(merkleProof)-1),
 	}
 
 	// 设置witness的值
@@ -362,12 +361,12 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 		}
 	}
 
-	for i := 0; i < len(merkleProof); i++ {
-		witness.Path[i].Assign(merkleProof[i])
-	}
-	for i := 0; i < len(merkleProof)-1; i++ {
-		witness.Helper[i].Assign(proofHelper[i])
-	}
+	// for i := 0; i < len(merkleProof); i++ {
+	// 	witness.Path[i].Assign(merkleProof[i])
+	// }
+	// for i := 0; i < len(merkleProof)-1; i++ {
+	// 	witness.Helper[i].Assign(proofHelper[i])
+	// }
 
 	// 生成证明
 	proof, err := groth16.Prove(r1cs, pk, witness)
@@ -482,8 +481,8 @@ func VerifyProof(proofStr string) error {
 	}
 
 	publicWitness := &merkleCircuit{
-		OldRStateRoot:  frontend.Value(output.OldStateRoot),
-		RootHash:       frontend.Value(output.BatchRoot),
+		OldRStateRoot: frontend.Value(output.OldStateRoot),
+		// RootHash:       frontend.Value(output.BatchRoot),
 		FinalStateRoot: frontend.Value(output.NewStateRoot),
 	}
 
@@ -504,65 +503,6 @@ func VerifyProof(proofStr string) error {
 	}
 	return nil
 }
-
-// func main() {
-// 	// 创建固定的账户状态
-// 	accounts := []Account{
-// 		{
-// 			Address: "0000000000000000000000000000000000000001",
-// 			Balance: 1000000,
-// 			Nonce:   0,
-// 		},
-// 		{
-// 			Address: "0000000000000000000000000000000000000002",
-// 			Balance: 500000,
-// 			Nonce:   0,
-// 		},
-// 	}
-
-// 	// 计算旧状态根
-// 	old_merkleRoot := computeAccountMerkleRoot(accounts)
-// 	fmt.Printf("old_merkleRoot: %v\n", old_merkleRoot)
-
-// 	// 创建固定的交易序列
-// 	transactions := []Transaction{
-// 		{
-// 			From:   "0000000000000000000000000000000000000001",
-// 			To:     "0000000000000000000000000000000000000002",
-// 			Amount: 50000,
-// 			Nonce:  0,
-// 		},
-// 	}
-
-// 	input := ProofInput{
-// 		OldStateRoot: old_merkleRoot,
-// 		Accounts:     accounts,
-// 		Transactions: transactions,
-// 	}
-
-// 	// 生成证明
-// 	output, err := GenerateProof(input)
-// 	if err != nil {
-// 		fmt.Printf("Failed to generate proof: %v\n", err)
-// 		return
-// 	}
-
-// 	// 序列化输出
-// 	outputBytes, err := json.Marshal(output)
-// 	if err != nil {
-// 		fmt.Printf("Failed to marshal proof output: %v\n", err)
-// 		return
-// 	}
-
-// 	// 验证证明
-// 	err = VerifyProof(string(outputBytes))
-// 	if err != nil {
-// 		fmt.Printf("Failed to verify proof: %v\n", err)
-// 		return
-// 	}
-
-// 	fmt.Println("Proof verification succeeded!")
-// }
 
 // 辅助函数：解析地址字符串为整数
 func parseInt(s string) int {

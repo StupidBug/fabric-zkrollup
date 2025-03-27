@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/StupidBug/fabric-zkrollup/pkg/api/types"
 	"github.com/StupidBug/fabric-zkrollup/pkg/chaincode"
 	"github.com/StupidBug/fabric-zkrollup/pkg/core/txpool"
 	"github.com/StupidBug/fabric-zkrollup/pkg/crypto"
@@ -15,11 +16,12 @@ import (
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/block"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/state"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
+	"github.com/StupidBug/fabric-zkrollup/pkg/utils.go"
 	"github.com/StupidBug/fabric-zkrollup/pkg/zk"
 )
 
 const (
-	maxTransactions = 0
+	maxTransactions = 128
 	debug           = true
 )
 
@@ -31,22 +33,26 @@ type Blockchain struct {
 	txPool      *txpool.TxPool
 	merkleTree  *crypto.MerkleTree // 当前区块的 Merkle 树
 	createBlock chan struct{}
+	packageCh   chan *block.Block
 	autoBlock   bool
 }
 
 // NewBlockchain creates a new blockchain instance
 func NewBlockchain() *Blockchain {
-	callback := make(chan struct{})
+	callbackCh := make(chan struct{})
+	packageCh := make(chan *block.Block)
 	bc := &Blockchain{
 		blocks:      make([]*block.Block, 0),
 		state:       state.NewState(),
-		txPool:      txpool.NewTxPool(callback),
+		txPool:      txpool.NewTxPool(),
 		merkleTree:  crypto.NewMerkleTree(nil),
-		createBlock: callback,
 		autoBlock:   false,
+		createBlock: callbackCh,
+		packageCh:   packageCh,
 	}
+	go bc.PackageWoker()
 
-	var accounts []zk.Account
+	var accounts []types.Account
 	if debug {
 		accounts = mock.MockBalance()
 	} else {
@@ -109,13 +115,13 @@ func (bc *Blockchain) AddTransaction(tx transaction.Transaction) error {
 		log.Printf("Public key not found for sender %s", tx.From)
 		return fmt.Errorf("public key not found for sender %s", tx.From)
 	}
-	log.Printf("Found public key for sender %s: X=%s, Y=%s", tx.From,
-		senderPubKey.X.String(), senderPubKey.Y.String())
+	// log.Printf("Found public key for sender %s: X=%s, Y=%s", tx.From,
+	// 	senderPubKey.X.String(), senderPubKey.Y.String())
 
 	// Verify signature
 	txHash := tx.ComputeHash()
-	log.Printf("Transaction hash for verification: %x", txHash)
-	log.Printf("Signature values - R: %s, S: %s", tx.Signature.R.String(), tx.Signature.S.String())
+	// log.Printf("Transaction hash for verification: %x", txHash)
+	// log.Printf("Signature values - R: %s, S: %s", tx.Signature.R.String(), tx.Signature.S.String())
 
 	if !tx.VerifySignature(senderPubKey) {
 		log.Printf("Signature verification failed for transaction %x", txHash)
@@ -125,7 +131,7 @@ func (bc *Blockchain) AddTransaction(tx transaction.Transaction) error {
 	// Get current balance and nonce - acquire read lock
 	bc.mu.RLock()
 	senderBalance := bc.state.GetBalance(tx.From)
-	expectedNonce := bc.state.GetNonce(tx.From)
+	// expectedNonce := bc.state.GetNonce(tx.From)
 	bc.mu.RUnlock()
 
 	// Validate balance and nonce
@@ -135,22 +141,22 @@ func (bc *Blockchain) AddTransaction(tx transaction.Transaction) error {
 		return fmt.Errorf("insufficient balance")
 	}
 
-	if tx.Nonce != expectedNonce {
-		log.Printf("Invalid nonce - Expected: %d, Got: %d",
-			expectedNonce, tx.Nonce)
-		return fmt.Errorf("invalid nonce: expected %d, got %d", expectedNonce, tx.Nonce)
-	}
+	// if tx.Nonce != expectedNonce {
+	// 	log.Printf("Invalid nonce - Expected: %d, Got: %d",
+	// 		expectedNonce, tx.Nonce)
+	// 	return fmt.Errorf("invalid nonce: expected %d, got %d", expectedNonce, tx.Nonce)
+	// }
 
 	// Add to transaction pool - acquire write lock
 	bc.mu.Lock()
 	bc.txPool.Add(tx)
 	bc.mu.Unlock()
 
-	if bc.txPool.Size() > maxTransactions {
+	if bc.txPool.Size() >= maxTransactions {
 		bc.createBlock <- struct{}{}
 	}
 
-	log.Printf("Added transaction %s to pool", tx.String())
+	// log.Printf("Added transaction %s to pool", tx.String())
 	return nil
 }
 
@@ -215,10 +221,8 @@ func (bc *Blockchain) GetLatestBlock() *block.Block {
 
 // CreateBlock creates a new block with transactions from the pool
 func (bc *Blockchain) CreateBlock() error {
-	// Get pending transactions without any lock
-	transactions := bc.txPool.GetAll()
+	transactions := bc.PopTransactions()
 	if len(transactions) == 0 {
-		log.Printf("No transactions in pool to create block")
 		return fmt.Errorf("no transactions to create block")
 	}
 
@@ -252,18 +256,7 @@ func (bc *Blockchain) CreateBlock() error {
 
 	log.Printf("applyTransactions: %d", len(transactions))
 	// Apply transactions and update state
-	if newStateRoot, err := bc.applyTransactions(block); err != nil {
-		return fmt.Errorf("failed to apply transactions: %v", err)
-	} else {
-		// Update state root
-		block.Header.StateRoot = newStateRoot
-	}
-
-	// Add block to chain
-	bc.blocks = append(bc.blocks, block)
-
-	// Clear processed transactions from pool
-	bc.txPool.Clear()
+	bc.packageCh <- block
 
 	return nil
 }
@@ -311,7 +304,7 @@ func (bc *Blockchain) StartAutoBlock() {
 
 	go func() {
 		log.Println("Starting auto block creation goroutine")
-		ticker := time.NewTicker(1 * time.Second) // Create block every 1 second
+		ticker := time.NewTicker(5 * time.Second) // Create block every 1 second
 		defer ticker.Stop()
 
 		checkAndCreateBlock := func() {
@@ -331,9 +324,8 @@ func (bc *Blockchain) StartAutoBlock() {
 				log.Printf("Auto block creation triggered with %d transactions in pool", poolSize)
 				if err := bc.CreateBlock(); err != nil {
 					log.Printf("Error creating block: %v", err)
-				} else {
-					log.Printf("Successfully created new block with %d transactions", poolSize)
 				}
+				log.Printf("Successfully created new block with %d transactions", bc.GetLatestBlock().Header.TransactionCount)
 			} else {
 				log.Printf("No transactions in pool during auto block creation")
 			}
@@ -366,34 +358,18 @@ func (bc *Blockchain) StopAutoBlock() {
 	bc.mu.Unlock()
 }
 
+func (bc *Blockchain) PackageWoker() {
+	for block := range bc.packageCh {
+		bc.applyTransactions(block)
+		bc.blocks = append(bc.blocks, block)
+	}
+}
+
 // applyTransactions applies a list of transactions and updates the state tree
-func (bc *Blockchain) applyTransactions(block *block.Block) (string, error) {
-	// 准备输入数据
-	var accounts []zk.Account
-
+func (bc *Blockchain) applyTransactions(block *block.Block) error {
 	// 获取所有账户状态
-	allAccounts := bc.state.GetAllAccounts()
-	for addr, acc := range allAccounts {
-		accounts = append(accounts, zk.Account{
-			Address: addr,
-			Balance: acc.Balance,
-			Nonce:   int(acc.Nonce),
-		})
-	}
-	sort.Slice(accounts, func(i, j int) bool {
-		return accounts[i].Address < accounts[j].Address
-	})
-
-	// 准备交易数据
-	var transactions []zk.Transaction
-	for _, tx := range block.Transactions {
-		transactions = append(transactions, zk.Transaction{
-			From:   tx.From,
-			To:     tx.To,
-			Amount: tx.Value,
-			Nonce:  int(tx.Nonce),
-		})
-	}
+	accounts := bc.GetAccountsForProof()
+	transactions := bc.GetTransactionForProof(block)
 
 	oldStateRoot := bc.GetStateRoot()
 	// 准备证明输入
@@ -402,12 +378,14 @@ func (bc *Blockchain) applyTransactions(block *block.Block) (string, error) {
 		Accounts:     accounts,
 		Transactions: transactions,
 	}
+	utils.PrintSlice(input.Accounts)
+	utils.PrintSlice(input.Transactions)
 
-	fmt.Printf("input: %#v\n", input)
 	// 生成证明
 	output, err := zk.GenerateProof(input)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate ZK proof [req: %#v]: %v", input, err)
+		panic(fmt.Errorf("failed to generate ZK proof [transactions: %d]: %w", len(input.Transactions), err))
+		return fmt.Errorf("failed to generate ZK proof [req: %#v]: %v", input, err)
 	}
 
 	if debug {
@@ -428,9 +406,11 @@ func (bc *Blockchain) applyTransactions(block *block.Block) (string, error) {
 		bc.state.SetBalance(account.Address, account.Balance)
 		bc.state.SetNonce(account.Address, uint64(account.Nonce))
 	}
+	// Update state root
+	block.Header.StateRoot = output.NewStateRoot
 
-	fmt.Println("output.NewStateRoot: ", output.NewStateRoot)
-	return output.NewStateRoot, nil
+	fmt.Println("output new stateRoot: ", output.NewStateRoot)
+	return nil
 }
 
 // GetPublicKey returns the public key for an address
