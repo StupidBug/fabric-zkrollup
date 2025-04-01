@@ -1,6 +1,6 @@
 module github.com/StupidBug/fabric-zkrollup
 
-go 1.23.5
+go 1.23.1
 
 require (
 	github.com/consensys/gnark v0.5.2

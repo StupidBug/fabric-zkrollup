@@ -93,7 +93,6 @@ github.com/consensys/gnark/internal/backend/ioutils
 github.com/consensys/gnark/internal/parser
 github.com/consensys/gnark/internal/utils
 github.com/consensys/gnark/io
-github.com/consensys/gnark/std/accumulator/merkle
 github.com/consensys/gnark/std/hash/mimc
 # github.com/consensys/gnark-crypto v0.5.3
 ## explicit; go 1.16
