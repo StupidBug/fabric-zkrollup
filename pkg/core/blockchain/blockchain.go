@@ -22,7 +22,7 @@ import (
 
 const (
 	maxTransactions = 128
-	debug           = true
+	debug           = false
 )
 
 // Blockchain represents the blockchain
