@@ -232,7 +232,7 @@ func Package(input StorageProofInput) (*StorageProofOutput, error) {
 	}
 
 	// 构建Merkle证明
-	merkleRoot, merkleProof, numLeaves, err := merkletree.BuildReaderProof(bytes.NewReader([]byte(strings.Join(input.Evidence, "\n"))), bn254.NewMiMC("seed"), 10, uint64(len(input.Evidence)-1))
+	merkleRoot, merkleProof, numLeaves, err := merkletree.BuildReaderProof(bytes.NewReader([]byte(strings.Join(input.Evidence, "\n"))), bn254.NewMiMC("seed"), 1, uint64(len(input.Evidence)-1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to build merkle proof: %v", err)
 	}
@@ -316,7 +316,7 @@ func VerifyStorageProof(proofStr string) error {
 		return fmt.Errorf("failed to unmarshal proof output: %v", err)
 	}
 
-	publicWitness := &storageCircuit{
+	publicWitness := &merkleCircuit{
 		OldStateRoot:   frontend.Value(output.OldStateRoot),
 		RootHash:       frontend.Value(output.BatchRoot),
 		FinalStateRoot: frontend.Value(output.NewStateRoot),
