@@ -40,9 +40,20 @@ func OrginValidate(id string, storageOutput string) {
 	if err != nil {
 		log.Fatalf("Failed to evaluate transaction: %v", err)
 	}
-	var prettyJSON bytes.Buffer
-	if err := json.Indent(&prettyJSON, result, "", "    "); err != nil {
+	var prettyStorageProof bytes.Buffer
+	if err := json.Indent(&prettyStorageProof, result, "", "    "); err != nil {
 		log.Fatalf("Failed to format JSON: %v", err)
 	}
-	log.Println(prettyJSON.String())
+	log.Println(prettyStorageProof.String())
+
+	log.Println("--> Evaluate Transaction: GetAllEvidences, function returns all the current Evidences")
+	result, err = contract.EvaluateTransaction("GetAllEvidences")
+	if err != nil {
+		log.Fatalf("Failed to evaluate transaction: %v", err)
+	}
+	var prettyEvidences bytes.Buffer
+	if err := json.Indent(&prettyEvidences, result, "", "    "); err != nil {
+		log.Fatalf("Failed to format JSON: %v", err)
+	}
+	log.Println(prettyEvidences.String())
 }
