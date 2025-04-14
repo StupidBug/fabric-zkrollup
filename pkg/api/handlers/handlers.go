@@ -11,6 +11,7 @@ import (
 
 	"github.com/StupidBug/fabric-zkrollup/pkg/api/types"
 	"github.com/StupidBug/fabric-zkrollup/pkg/core/blockchain"
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/status"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 
 	"github.com/gin-gonic/gin"
@@ -79,7 +80,7 @@ func (h *Handler) SendTransaction(c *gin.Context) {
 		To:        req.To,
 		Value:     req.Value,
 		Nonce:     nonce,
-		Status:    transaction.StatusPending,
+		Status:    status.StatusPending,
 		Timestamp: time.Now().Unix(),
 		Signature: transaction.Signature{
 			R: r,

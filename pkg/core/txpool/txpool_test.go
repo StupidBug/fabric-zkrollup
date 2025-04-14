@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/status"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 )
 
@@ -13,7 +14,7 @@ func createTestTransaction(value int64, nonce uint64) transaction.Transaction {
 		To:        "receiver",
 		Value:     int(value),
 		Nonce:     nonce,
-		Status:    transaction.StatusPending,
+		Status:    status.StatusPending,
 		Timestamp: time.Now().Unix(),
 	}
 }

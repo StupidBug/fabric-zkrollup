@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/status"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 )
 
@@ -23,7 +24,7 @@ func createTestTransaction(value int64, nonce uint64) transaction.Transaction {
 		To:        "0000000000000000000000000000000000000002", // Use genesis account
 		Value:     int(value),
 		Nonce:     nonce,
-		Status:    transaction.StatusPending,
+		Status:    status.StatusPending,
 		Timestamp: time.Now().Unix(),
 	}
 
@@ -72,8 +73,8 @@ func TestBlockCreation(t *testing.T) {
 	if confirmedTx == nil {
 		t.Fatal("Transaction not found after block creation")
 	}
-	if confirmedTx.Status != transaction.StatusConfirmed {
-		t.Errorf("Expected transaction status %v, got %v", transaction.StatusConfirmed, confirmedTx.Status)
+	if confirmedTx.Status != status.StatusConfirmed {
+		t.Errorf("Expected transaction status %v, got %v", status.StatusConfirmed, confirmedTx.Status)
 	}
 
 	// Verify balances are updated
@@ -121,8 +122,8 @@ func TestAutoBlockCreation(t *testing.T) {
 	if confirmedTx == nil {
 		t.Fatal("Transaction not found after block creation")
 	}
-	if confirmedTx.Status != transaction.StatusConfirmed {
-		t.Errorf("Expected transaction status %v, got %v", transaction.StatusConfirmed, confirmedTx.Status)
+	if confirmedTx.Status != status.StatusConfirmed {
+		t.Errorf("Expected transaction status %v, got %v", status.StatusConfirmed, confirmedTx.Status)
 	}
 
 	// Verify balances

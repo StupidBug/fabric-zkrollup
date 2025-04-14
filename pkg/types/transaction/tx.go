@@ -7,29 +7,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/status"
 )
-
-// Status represents the status of a transaction
-type Status int
-
-const (
-	StatusPending Status = iota
-	StatusConfirmed
-	StatusFailed
-)
-
-func (s Status) String() string {
-	switch s {
-	case StatusPending:
-		return "pending"
-	case StatusConfirmed:
-		return "confirmed"
-	case StatusFailed:
-		return "failed"
-	default:
-		return "unknown"
-	}
-}
 
 // Signature represents an ECDSA signature
 type Signature struct {
@@ -39,14 +19,14 @@ type Signature struct {
 
 // Transaction represents a transaction in the blockchain
 type Transaction struct {
-	Hash      [32]byte  // Hash of the transaction
-	From      string    // Sender's address
-	To        string    // Recipient's address
-	Value     int       // Amount to transfer
-	Nonce     uint64    // Transaction nonce
-	Status    Status    // Transaction status
-	Timestamp int64     // Transaction timestamp
-	Signature Signature // Transaction signature
+	Hash      [32]byte      // Hash of the transaction
+	From      string        // Sender's address
+	To        string        // Recipient's address
+	Value     int           // Amount to transfer
+	Nonce     uint64        // Transaction nonce
+	Status    status.Status // Transaction status
+	Timestamp int64         // Transaction timestamp
+	Signature Signature     // Transaction signature
 }
 
 // ComputeHash calculates the hash of a transaction

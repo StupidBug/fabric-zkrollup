@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/status"
 )
 
 func TestTransactionHash(t *testing.T) {
@@ -16,7 +18,7 @@ func TestTransactionHash(t *testing.T) {
 		To:        "0x0987654321098765432109876543210987654321",
 		Value:     1000,
 		Nonce:     1,
-		Status:    StatusPending,
+		Status:    status.StatusPending,
 		Timestamp: time.Now().Unix(),
 	}
 
@@ -46,13 +48,13 @@ func TestTransactionHash(t *testing.T) {
 
 func TestTransactionStatus(t *testing.T) {
 	tests := []struct {
-		status Status
+		status status.Status
 		want   string
 	}{
-		{StatusPending, "pending"},
-		{StatusConfirmed, "confirmed"},
-		{StatusFailed, "failed"},
-		{Status(99), "unknown"},
+		{status.StatusPending, "pending"},
+		{status.StatusConfirmed, "confirmed"},
+		{status.StatusFailed, "failed"},
+		{status.Status(99), "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -69,7 +71,7 @@ func TestTransactionString(t *testing.T) {
 		To:        "receiver",
 		Value:     1000,
 		Nonce:     1,
-		Status:    StatusPending,
+		Status:    status.StatusPending,
 		Timestamp: time.Now().Unix(),
 	}
 
@@ -122,7 +124,7 @@ func TestTransactionSignature(t *testing.T) {
 		To:        "receiver",
 		Value:     1000,
 		Nonce:     1,
-		Status:    StatusPending,
+		Status:    status.StatusPending,
 		Timestamp: time.Now().Unix(),
 	}
 
@@ -166,7 +168,7 @@ func TestSignatureConsistency(t *testing.T) {
 		To:        "receiver",
 		Value:     1000,
 		Nonce:     1,
-		Status:    StatusPending,
+		Status:    status.StatusPending,
 		Timestamp: time.Now().Unix(),
 	}
 
@@ -202,7 +204,7 @@ func TestInvalidSignatures(t *testing.T) {
 		To:        "receiver",
 		Value:     1000,
 		Nonce:     1,
-		Status:    StatusPending,
+		Status:    status.StatusPending,
 		Timestamp: time.Now().Unix(),
 	}
 

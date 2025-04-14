@@ -47,8 +47,8 @@ type SerializedTransaction struct {
 
 type merkleCircuit struct {
 	// 公开输入
-	OldRStateRoot frontend.Variable `gnark:",public"` // 前一个状态根
-	// RootHash       frontend.Variable `gnark:",public"` //批次根
+	OldStateRoot   frontend.Variable `gnark:",public"` // 前一个状态根
+	RootHash       frontend.Variable `gnark:",public"` //批次根
 	FinalStateRoot frontend.Variable `gnark:",public"` // 最终状态根
 
 	// 账户状态
@@ -104,7 +104,7 @@ func (circuit *merkleCircuit) Define(curveID ecc.ID, api frontend.API) error {
 
 	// api.Println(circuit.OldRStateRoot)
 	// api.Println(old_hashes[0])
-	api.AssertIsEqual(circuit.OldRStateRoot, old_hashes[0])
+	api.AssertIsEqual(circuit.OldStateRoot, old_hashes[0])
 
 	// 处理每笔交易
 	for i := 0; i < len(circuit.Transactions); i++ {
@@ -331,7 +331,7 @@ func GenerateProof(input ProofInput) (*ProofOutput, error) {
 
 	// 创建witness
 	witness := &merkleCircuit{
-		OldRStateRoot: frontend.Value(input.OldStateRoot),
+		OldStateRoot: frontend.Value(input.OldStateRoot),
 		// RootHash:       frontend.Value(merkleRoot),
 		FinalStateRoot: frontend.Value(merkleRoot1),
 		Transactions:   make([]CircuitTransaction, batchSize),
@@ -480,7 +480,7 @@ func VerifyProof(proofStr string) error {
 	}
 
 	publicWitness := &merkleCircuit{
-		OldRStateRoot: frontend.Value(output.OldStateRoot),
+		OldStateRoot: frontend.Value(output.OldStateRoot),
 		// RootHash:       frontend.Value(output.BatchRoot),
 		FinalStateRoot: frontend.Value(output.NewStateRoot),
 	}

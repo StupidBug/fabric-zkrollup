@@ -15,6 +15,7 @@ import (
 	"github.com/StupidBug/fabric-zkrollup/pkg/mock"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/block"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/state"
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/status"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 	"github.com/StupidBug/fabric-zkrollup/pkg/utils.go"
 	"github.com/StupidBug/fabric-zkrollup/pkg/zk"
@@ -397,7 +398,7 @@ func (bc *Blockchain) applyTransactions(block *block.Block) error {
 	for i := range block.Transactions {
 		tx := &block.Transactions[i]
 		// 更新交易状态
-		tx.Status = transaction.StatusConfirmed
+		tx.Status = status.StatusConfirmed
 	}
 
 	// 更新账户状态

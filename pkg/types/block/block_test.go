@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/StupidBug/fabric-zkrollup/pkg/crypto"
+	"github.com/StupidBug/fabric-zkrollup/pkg/types/status"
 	"github.com/StupidBug/fabric-zkrollup/pkg/types/transaction"
 )
 
@@ -14,7 +15,7 @@ func createTestTransaction(from, to string, value int64, nonce uint64) transacti
 		To:        to,
 		Value:     int(value),
 		Nonce:     nonce,
-		Status:    transaction.StatusPending,
+		Status:    status.StatusPending,
 		Timestamp: time.Now().Unix(),
 	}
 	transaction.Hash = transaction.ComputeHash()
