@@ -2,11 +2,15 @@ package zk
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
+	"strconv"
 	"strings"
+	"time"
 
 	"encoding/base64"
 
@@ -19,6 +23,10 @@ import (
 	"github.com/consensys/gnark/std/accumulator/merkle"
 	"github.com/consensys/gnark/std/hash/mimc"
 )
+
+const chainID = "customChainID"
+
+var evidenceID int
 
 type StorageRollup interface {
 	Package(*StorageProofInput) *StorageProofOutput // 打包
@@ -36,9 +44,9 @@ type StorageProofOutput struct {
 	OldStateRoot string
 	BatchRoot    string
 	NewStateRoot string
-	Evidence     []string    // 添加新的账户状态字段
-	Proof        interface{} // 使用interface{}来存储proof
-	Vk           interface{} // 使用interface{}来存储vk
+	Evidence     []EvidenceRecord // 添加新的账户状态字段
+	Proof        interface{}      // 使用interface{}来存储proof
+	Vk           interface{}      // 使用interface{}来存储vk
 }
 
 type storageCircuit struct {
@@ -118,16 +126,28 @@ func ComputeStorageMerkleRoot(evidence []string) string {
 
 // 序列化的输出结构体
 type SerializedStorageProofOutput struct {
-	OldStateRoot string   `json:"old_state_root"`
-	BatchRoot    string   `json:"batch_root"`
-	NewStateRoot string   `json:"new_state_root"`
-	Evidence     []string `json:"evidence"`
-	ProofData    string   `json:"proof"`
-	VkData       string   `json:"vk"`
+	OldStateRoot string           `json:"old_state_root"`
+	BatchRoot    string           `json:"batch_root"`
+	NewStateRoot string           `json:"new_state_root"`
+	Evidence     []EvidenceRecord `json:"evidence"`
+	ProofData    string           `json:"proof"`
+	VkData       string           `json:"vk"`
+}
+
+// EvidenceRecord
+type EvidenceRecord struct {
+	EvidenceID     string            `json:"EvidenceID"`
+	DataHash       string            `json:"DataHash"`
+	EvidenceData   string            `json:"EvidenceData"`
+	Status         string            `json:"Status"`
+	CreateTime     int64             `json:"CreateTime"`
+	UpdateTime     int64             `json:"UpdateTime"`
+	ChainID        string            `json:"ChainID"`
+	AdditionalInfo map[string]string `json:"AdditionalInfo"`
 }
 
 // 序列化StorageProofOutput
-func (p *StorageProofOutput) MarshalJSON() ([]byte, error) {
+func (p StorageProofOutput) MarshalJSON() ([]byte, error) {
 	// 创建缓冲区
 	proofBuf := new(bytes.Buffer)
 	vkBuf := new(bytes.Buffer)
@@ -294,16 +314,31 @@ func Package(input StorageProofInput) (*StorageProofOutput, error) {
 		return nil, fmt.Errorf("failed to generate proof: %v", err)
 	}
 
+	evidenceRecords := make([]EvidenceRecord, 0, len(input.Evidence))
+	for _, data := range input.Evidence {
+		hash := sha256.Sum256([]byte(data))
+		evidenceRecords = append(evidenceRecords, EvidenceRecord{
+			EvidenceID:     strconv.Itoa(evidenceID),
+			DataHash:       hex.EncodeToString(hash[:]),
+			EvidenceData:   data,
+			Status:         "AVAILABLE",
+			CreateTime:     time.Now().UnixMilli(),
+			UpdateTime:     time.Now().UnixMilli(),
+			ChainID:        chainID,
+			AdditionalInfo: make(map[string]string),
+		})
+		evidenceID++
+	}
+
 	// 创建输出
 	output := &StorageProofOutput{
 		OldStateRoot: input.OldStateRoot,
 		BatchRoot:    merkleRootStr,
 		NewStateRoot: newStateRoot,
-		Evidence:     input.Evidence,
+		Evidence:     evidenceRecords,
 		Proof:        proof,
 		Vk:           vk,
 	}
-
 	return output, nil
 }
 
@@ -316,7 +351,7 @@ func VerifyStorageProof(proofStr string) error {
 		return fmt.Errorf("failed to unmarshal proof output: %v", err)
 	}
 
-	publicWitness := &merkleCircuit{
+	publicWitness := &storageCircuit{
 		OldStateRoot:   frontend.Value(output.OldStateRoot),
 		RootHash:       frontend.Value(output.BatchRoot),
 		FinalStateRoot: frontend.Value(output.NewStateRoot),

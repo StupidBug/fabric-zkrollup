@@ -47,8 +47,8 @@ type SerializedTransaction struct {
 
 type merkleCircuit struct {
 	// 公开输入
-	OldStateRoot   frontend.Variable `gnark:",public"` // 前一个状态根
-	RootHash       frontend.Variable `gnark:",public"` //批次根
+	OldStateRoot frontend.Variable `gnark:",public"` // 前一个状态根
+	// RootHash       frontend.Variable `gnark:",public"` //批次根
 	FinalStateRoot frontend.Variable `gnark:",public"` // 最终状态根
 
 	// 账户状态
