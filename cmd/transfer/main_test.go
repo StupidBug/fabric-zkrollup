@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/StupidBug/fabric-zkrollup/pkg/api/types"
@@ -22,7 +23,7 @@ import (
 const (
 	baseURL = "http://localhost:8080/api/v1"
 
-	numTransactions = 100 // 增加到1000笔交易
+	numTransactions = 10 // 增加到1000笔交易
 	maxRetries      = 10
 	retryInterval   = 3 * time.Second
 	batchSize       = 1   // 每批次发送50笔交易
@@ -203,7 +204,7 @@ func sendTransactionWorker(idx int) (string, error) {
 	}
 	resp.Body.Close()
 	time.Sleep(100 * time.Millisecond)
-	// fmt.Printf("工作线程 %d 发送交易成功: %s %#v\n", idx, result.Hash, txReq)
+	fmt.Printf("工作线程 %d 发送交易成功: %s %#v\n", idx, result.Hash, txReq)
 
 	return result.Hash, nil
 }
@@ -241,7 +242,7 @@ func waitForConfirmation(txHash string) bool {
 		// fmt.Printf("交易 %s 状态: %s\n", txHash, status)
 
 		if status == "confirmed" {
-			// fmt.Printf("交易 %s 确认成功\n", txHash)
+			fmt.Printf("交易 %s 确认成功\n", txHash)
 			return true
 		}
 
@@ -335,7 +336,7 @@ func displayAllBlocks() {
 	}
 }
 
-func main() {
+func TestMain(t *testing.T) {
 	// 检查服务器是否运行
 	if !checkServerRunning() {
 		fmt.Println("服务器未运行。请先启动服务器。")

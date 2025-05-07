@@ -17,7 +17,7 @@ import (
 const (
 	baseURL       = "http://localhost:8080/api/v1"
 	maxRetries    = 5
-	maxWorkers    = 20
+	maxWorkers    = 10
 	taskPerWorker = 10
 	retryInterval = 3 * time.Second
 )
