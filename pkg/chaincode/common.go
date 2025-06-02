@@ -7,63 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/StupidBug/fabric-zkrollup/conf"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/gateway"
-)
-
-var ccpPath = filepath.Join(
-	"/Users/leiming/go/src",
-	"fabric-samples",
-	"test-network",
-	"organizations",
-	"peerOrganizations",
-	"org1.example.com",
-	"connection-org1.yaml",
-)
-
-// var ccpPath = filepath.Join(
-// 	"/",
-// 	"home",
-// 	"zkr",
-// 	"hyperledger-fabric",
-// 	"fabric-samples",
-// 	"test-network",
-// 	"organizations",
-// 	"peerOrganizations",
-// 	"org1.example.com",
-// 	"connection-org1.yaml",
-// )
-
-var credPath = filepath.Join(
-	"/Users/leiming/go/src",
-	"fabric-samples",
-	"test-network",
-	"organizations",
-	"peerOrganizations",
-	"org1.example.com",
-	"users",
-	"User1@org1.example.com",
-	"msp",
-)
-
-// var credPath = filepath.Join(
-// 	"/",
-// 	"home",
-// 	"zkr",
-// 	"hyperledger-fabric",
-// 	"fabric-samples",
-// 	"test-network",
-// 	"organizations",
-// 	"peerOrganizations",
-// 	"org1.example.com",
-// 	"users",
-// 	"User1@org1.example.com",
-// 	"msp",
-// )
-
-const (
-	myChannel     = "mychannel"
-	smartContract = "basic"
 )
 
 func connectToNetwork() *gateway.Contract {
@@ -84,7 +30,7 @@ func connectToNetwork() *gateway.Contract {
 		}
 	}
 	gw, err := gateway.Connect(
-		gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
+		gateway.WithConfig(config.FromFile(filepath.Clean(conf.CcpPath))),
 		gateway.WithIdentity(wallet, "appUser"),
 	)
 	if err != nil {
@@ -92,25 +38,25 @@ func connectToNetwork() *gateway.Contract {
 	}
 	defer gw.Close()
 
-	network, err := gw.GetNetwork(myChannel)
+	network, err := gw.GetNetwork(conf.Channel)
 	if err != nil {
 		log.Fatalf("Failed to get network: %v", err)
 	}
-	contract := network.GetContract(smartContract)
+	contract := network.GetContract(conf.Contract)
 	return contract
 }
 
 func populateWallet(wallet *gateway.Wallet) error {
 	log.Println("============ Populating wallet ============")
 
-	certPath := filepath.Join(credPath, "signcerts", "cert.pem")
+	certPath := filepath.Join(conf.CredPath, "signcerts", "cert.pem")
 	// read the certificate pem
 	cert, err := ioutil.ReadFile(filepath.Clean(certPath))
 	if err != nil {
 		return err
 	}
 
-	keyDir := filepath.Join(credPath, "keystore")
+	keyDir := filepath.Join(conf.CredPath, "keystore")
 	// there's a single file in this dir containing the private key
 	files, err := ioutil.ReadDir(keyDir)
 	if err != nil {

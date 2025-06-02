@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
+	"github.com/StupidBug/fabric-zkrollup/conf"
 	"github.com/StupidBug/fabric-zkrollup/pkg/api/router"
 	"github.com/StupidBug/fabric-zkrollup/pkg/core/evidencepool"
 )
@@ -15,8 +17,7 @@ func main() {
 	r.Setup()
 
 	// Start HTTP server
-	log.Println("Server is running on :8080")
-	if err := r.Run(":8080"); err != nil {
+	if err := r.Run(fmt.Sprintf(":%s", conf.Port)); err != nil {
 		log.Fatal(err)
 	}
 }

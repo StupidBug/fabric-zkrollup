@@ -1,27 +1,24 @@
 TARGET ?= 
 
-define CLEAN 
+ifeq ($(TARGET), storage)
+TARGET_FILE := ./cmd/storage/main.go
+else ifeq ($(TARGET), transfer)
+TARGET_FILE := ./cmd/transfer/main.go
+endif
+
+all: run
+
+build:
+	@echo "Building target: $(TARGET)"
+	go build -gcflags="all=-N -l" -o bin/$(TARGET) $(TARGET_FILE)
+
+run: clean build
+	@echo "Running target: $(TARGET)"
+	./bin/$(TARGET)
+
+clean:
+	@echo "Cleaning up..."
 	@echo "deleting old wallet"
 	@rm -rf ./wallet
 	@rm -rf pkg/chaincode/wallet
 	@rm -rf ./keystore
-endef
-
-ifeq ($(TARGET), storage)
-define RUN_COMMAND
-	go run ./cmd/storage/main.go
-endef
-else ifeq ($(TARGET), transfer)
-define RUN_COMMAND
-	go run ./cmd/transfer/main.go
-endef
-endif
-
-run:
-	@echo "Running target: $(TARGET)"
-	${CLEAN}
-	$(RUN_COMMAND)
-
-clean:
-	@echo "Cleaning up..."
-	${CLEAN}
