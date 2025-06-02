@@ -284,7 +284,7 @@ func displayAccountStates() {
 	fmt.Println("----------------------------------------------------------------------")
 
 	// 获取并显示每个地址的余额和nonce
-	for i := 0; i < 10; i++ { // 只显示前10个账户，避免输出太多
+	for i := 0; i < mock.AccountsNum-1; i++ { // 只显示前10个账户，避免输出太多
 		addr := testAccounts[i].Address
 		bal := getBalance(addr)
 		nonce := GetNonce(addr, true)
